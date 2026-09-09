@@ -179,7 +179,7 @@ class ProcessingConfig:
 
 
 class RadarDopplerProcessor:
-    """Range-gated Doppler detector for UA200 tow-RX CIR radar.
+    """Range-gated Doppler detector for UA200 two-RX CIR radar.
 
     v5 changes:
     - Detects inactive/frozen RX channels per segment.
@@ -227,7 +227,7 @@ class RadarDopplerProcessor:
         # Debug storage for plotting
         self._debug_data: dict = {}
 
-    def _time_call_ms(self, timing_name: str, func, *argc, **kwargs):
+    def _time_call_ms(self, timing_name: str, func, *args, **kwargs):
         """Time a selected processing function with very small overhead.
 
         This is debug instrumentation only. It does not modify the returned value
@@ -235,7 +235,7 @@ class RadarDopplerProcessor:
         """
         t0 = time.perf_counter()
         try:
-            return func(*argc, **kwargs)
+            return func(*args, **kwargs)
         finally:
             try:
                 self._last_function_timings[timing_name] = float((time.perf_counter() - t0) * 1000.0)
@@ -255,7 +255,7 @@ class RadarDopplerProcessor:
             return None
 
         cir = np.asarray(cir[:self.cfg.cir_taps], dtype=np.complex64)   # Force length and convert to complex64
-        if self.last_committed_sequence is not None and sequence_id <= self.last_committed_sequence:    # Ignore if already process (or old) sequence
+        if self.last_committed_sequence is not None and sequence_id <= self.last_committed_sequence:    # Ignore if already processed (or old) sequence
             return None
         push_timings["processor_push_precheck_ms"] = float((time.perf_counter() - t_stage) * 1000.0)    # Record time taken for preprocessing (index/length/sequence) check
 
@@ -265,7 +265,7 @@ class RadarDopplerProcessor:
         pair[rx_index] = cir                            # Store current Rx CIR in sequence dict
         # If number of sequences stored in pending exceeds limit, delete oldest ones first
         if len(self.pending) > self.max_pending_sequences:
-            for old_seq in sorted(self.pending.key())[:-self.max_pending_sequences]:
+            for old_seq in sorted(self.pending.keys())[:-self.max_pending_sequences]:
                 self.pending.pop(old_seq, None)
 
         if len(pair) < 2:       # Do nothing before receiving 2Rx
@@ -330,7 +330,7 @@ class RadarDopplerProcessor:
             h["processor_segment_done_mono_s"] = float(process_done_mono)
             h["processor_segment_compute_ms"] = float((process_done_mono - process_start_mono) * 1000.0)
             h["processor_segment_size"] = int(self.cfg.segment_size)
-            h["processor_hop_size"] = int(self.cfg.hop_size)
+            h["processor_hop_size"] = int(self.hop_size)
             h["processor_period_ms"] = float(self.cfg.period_ms)
             h["processor_algorithm_window_ms"] = float(self.cfg.segment_size * self.cfg.period_ms)
             h["processor_algorithm_hop_ms"] = float(self.hop_size * self.cfg.period_ms)
@@ -344,7 +344,7 @@ class RadarDopplerProcessor:
         return result               # Return final SegmentResult
 
 
-    def _rx_health(self, seg_hp: np.ndarray) -> tuple[np.ndarray, dict[str,object]]:
+    def _rx_health(self, seg_hp: np.ndarray) -> tuple[np.ndarray, dict[str, object]]:
         cfg = self.cfg
         usable = np.arange(cfg.cir_taps) >= cfg.skip_bins
         usable &= self.range_cm >= cfg.min_range_cm
@@ -463,7 +463,7 @@ class RadarDopplerProcessor:
         edge = max(0, int(cfg.reject_edge_doppler_bins))                            # Number of edge doppler bins to block
         if edge > 0 and velocity_mask.size > 2 * edge:
             velocity_mask[:edge] = False
-            velocity_mask[:-edge] = False
+            velocity_mask[-edge:] = False
 
         # Range mask: satisfy both specified min/max range and skip_bins
         range_mask = (
@@ -1549,7 +1549,7 @@ class RadarDopplerProcessor:
                 ref_valid = valid_map[d0:d1, r0:r1].copy()
                 gd0 = max(0, di - cfg.guard_doppler) - d0
                 gd1 = min(nd, di + cfg.guard_doppler + 1) - d0
-                gr0 = max(0, ri + cfg.guard_range) - r0
+                gr0 = max(0, ri - cfg.guard_range) - r0
                 gr1 = min(nr, ri + cfg.guard_range + 1) - r0
                 ref_valid[gd0:gd1, gr0:gr1] = False
 

@@ -21,9 +21,9 @@ db_to_linear_amplitude = lambda gain_db: 10.0 ** (gain_db / 20.0)
 @dataclass
 class SimulationConfig:
     """
-    Container for main simulation configuration
+    Container for main simulation configuration.
     """
-    num_anteanns: int
+    num_antennas: int
     level: int = 1
     """Legacy numeric tag kept mainly for labeling plots/files. The actual simulation scenario is now controlled by:
         - hardware_profile
@@ -49,18 +49,18 @@ class SimulationConfig:
     """Radar ego motion (slow-time radar pose). Default type="static" is inert
     and takes a bit-identical legacy fast path. Set from the optional
     [radar_motion] INI section by create_default_config()."""
-    targets: list[Target] = field(default_factory=list)
-    static_clutter: list[StaticClutterPath] = field(default_factory=list)
+    targets: List[Target] = field(default_factory=list)
+    static_clutter: List[StaticClutterPath] = field(default_factory=list)
 
-    # metadata
+    #metadata
     radar: RadarTestConfig = field(default_factory=RadarTestConfig)
     dut: DUTConfig = field(default_factory=DUTConfig)
     build: BuildInfo = field(default_factory=BuildInfo)
 
     def __post_init__(self):
-        self.leakage = LeakageConfig(self.num_anteanns)
-        self.antenna = AntennaConfig(self.num_anteanns)
-        self.frontend = FrontendConfig(self.num_anteanns)
+        self.leakage = LeakageConfig(self.num_antennas)
+        self.antenna = AntennaConfig(self.num_antennas)
+        self.frontend = FrontendConfig(self.num_antennas)
 
 import configparser
 from datetime import datetime
@@ -98,7 +98,7 @@ def _require_sections(
 
     if missing:
         raise ValueError(
-            f"Missing required section(s) is synthetic default config: {missing}"
+            f"Missing required section(s) in synthetic default config: {missing}"
         )
 
 
@@ -107,9 +107,9 @@ def _default_synthetic_config_path() -> Path:
 
 
 def create_default_config(
-    config_path: str | Path | None = None,
+    config_path: Optional[str | Path] = None,
 ) -> SimulationConfig:
-    """Create SimulationConfig from synthetic_default.ini
+    """Create SimulationConfig from synthetic_default.ini.
 
     Args:
         config_path:
@@ -143,7 +143,7 @@ def create_default_config(
         [
             "simulation",
             "antenna",
-            "cir",  
+            "cir",
             "frontend",
             "radar",
             "build",
@@ -152,7 +152,7 @@ def create_default_config(
     )
 
     cfg = SimulationConfig(
-        num_anteanns=parser.getint("simulation", "num_antennas")
+        num_antennas=parser.getint("simulation", "num_antennas"),
     )
 
     # Hardware defaults
@@ -164,7 +164,7 @@ def create_default_config(
         "antenna",
         "carrier_freq_hz",
     )
-    cfg.antenna.pattern_mode = parser.get (
+    cfg.antenna.pattern_mode = parser.get(
         "antenna",
         "pattern_mode",
     )
@@ -173,7 +173,7 @@ def create_default_config(
         "boresight_deg",
     )
     # 3D-mode boresight offsets. Optional keys: fall back to safe defaults
-    # so older INI files withouth them keep working.
+    # so older INI files without them keep working.
     cfg.antenna.boresight_phi_deg = parser.getfloat(
         "antenna",
         "boresight_phi_deg",
@@ -229,7 +229,7 @@ def create_default_config(
     # measured G(phi, theta) CSV is loaded per antenna (see
     # load_pattern_gains_dbi_2d_csv()/load_pattern_gains_dbi_2d_per_ant_csv()
     # in dataconfig.py). Only pattern_mode == "table_3d" consumes these -
-    # other modes ignore pattern_gains_dbi_2d(_per_ant) entirely.abs
+    # other modes ignore pattern_gains_dbi_2d(_per_ant) entirely.
     pattern_csv_paths = []
     ant_idx = 0
     while parser.has_option("antenna", f"pattern_csv_ant{ant_idx}"):
@@ -245,7 +245,7 @@ def create_default_config(
         # pattern_gains_dbi_2d (the shared/fallback table) mirrors antenna 0's
         # table, so any antenna index beyond len(pattern_csv_paths) - 1 (not
         # given its own CSV) still gets a real measured pattern rather than
-        # silently falling back to the all-zero-dbi isotropic default.
+        # silently falling back to the all-zero-dBi isotropic default.
         cfg.antenna.pattern_gains_dbi_2d = cfg.antenna.pattern_gains_dbi_2d_per_ant[0]
         
     # num_antennas count, reused below for per-antenna list validation.
@@ -255,7 +255,7 @@ def create_default_config(
     # scalars set in _update_derived_hardware_params() (built-in profiles) or
     # injected from a fit JSON (hardware_profile = "fitted"); the old
     # [feedthrough] keys were dead config and have been removed.
-    n_ant = cfg.num_anteanns
+    n_ant = cfg.num_antennas
 
     # CIR defaults
     cfg.cir.num_bins = parser.getint(
@@ -334,7 +334,7 @@ def create_default_config(
         "profiles",
         "target_profile",
     )
-    # Optional: path to a fitted-impairment JSON, consumed onyl when
+    # Optional: path to a fitted-impairment JSON, consumed only when
     # hardware_profile == "fitted" (see _inject_params_from_json).
     cfg.hardware_params_json = parser.get(
         "profiles", "hardware_params_json", fallback=""
@@ -373,7 +373,7 @@ def create_default_config(
             "scene", "radar_height_z_m", fallback=cfg.scene.radar_height_z_m,
         )
         # radar_placement_mode / enable_default_room_clutter are not read
-        # hear: _apply_room_profile() unconditionally overwrites both from
+        # here: _apply_room_profile() unconditionally overwrites both from
         # the room_profile name, so an INI value here would be silently
         # clobbered.
         
@@ -382,7 +382,7 @@ def create_default_config(
     # strict: ego_motion.validate_ini_keys() rejects any unknown key and any
     # key belonging to a different `type`, so a typo cannot silently disable
     # the motion. Note this is deliberately stricter than the rest of this
-    # function, which uses tolerant `fallback=` read throughout.
+    # function, which uses tolerant `fallback=` reads throughout.
     if parser.has_section(ego_motion.INI_SECTION):
         section = ego_motion.INI_SECTION
         cfg.radar_motion.type = parser.get(
@@ -499,7 +499,7 @@ class CIRSimulator:
     
     def _build_antenna_positions(self) -> np.ndarray:
         """
-        Build 3D azimuth geometry
+        Build 3D antenna geometry.
 
         Coordinate meaning:
             x = forward/range direction
@@ -512,7 +512,7 @@ class CIRSimulator:
 
         Returns: numpy array of antenna positions, shape [num_antennas, 3].
         """
-        n = self.cfg.num_anteanns
+        n = self.cfg.num_antennas
         d = self.cfg.antenna.antenna_spacing_m
 
         rx = self.cfg.scene.radar_position_x_m
@@ -522,18 +522,18 @@ class CIRSimulator:
         rz = self.cfg.scene.radar_height_z_m if geometry_mode == "3d" else 0.0
 
         x_positions = np.full(n, rx, dtype=float)
-        y_offsets = np.linspace(-(n - 1) * d / 2, (n - 1) * d /2, n)
+        y_offsets = np.linspace(-(n - 1) * d / 2, (n - 1) * d / 2, n)
         y_positions = ry + y_offsets
         z_positions = np.full(n, rz, dtype=float)
 
         return np.stack([x_positions, y_positions, z_positions], axis=1)
 
-    # ----------------------------------------------------------------------
+    # -----------------------------------------------------------------------
     # Radar ego motion (slow-time radar pose)
     #
     # Pipeline boundary, enforced here and nowhere else:
     #
-    #   slow-time + configured base pose
+    #   slow_time + configured base pose
     #       -> pose trajectory (one pose per slow-time sample)
     #       -> Tx/Rx antenna phase-centre world coordinates
     #       -> path geometry -> delay -> carrier phase -> Doppler
@@ -548,9 +548,9 @@ class CIRSimulator:
     # _apply_radiation_leakage, _apply_pcb_leakage, _apply_early_leakage,
     # _apply_rx_gain, _apply_adc_clipping, _apply_quantization and the noise
     # block all run after the geometry loop and take no pose argument. Tx->Rx
-    # couping is body-fixed, so that is physically correct as well as
+    # coupling is body-fixed, so that is physically correct as well as
     # structurally convenient.
-    # ----------------------------------------------------------------------
+    # -----------------------------------------------------------------------
 
     def _build_ego_base_pose(self) -> "ego_motion.Pose":
         """The configured static radar pose that ego motion is relative to.
@@ -571,9 +571,9 @@ class CIRSimulator:
         )
 
     def _build_slow_time_grid_s(self) -> np.ndarray:
-        """Slow-time sample instants for the whole run, shape [num_frame].
+        """Slow-time sample instants for the whole run, shape [num_frames].
 
-        derived from _get_frame_time_s() so the motion model and the target
+        Derived from _get_frame_time_s() so the motion model and the target
         micro-motion model share exactly one time base (frame_idx * period).
 
         Returns:
@@ -601,7 +601,7 @@ class CIRSimulator:
                 to cfg.radar_motion.metadata so it reaches cir_metadata.json
                 through CIRMetadata.raw_config without any writer change).
 
-        NOTE self.antenna_positions keeps its pre-existing shape [N, 3] and tis
+        NOTE self.antenna_positions keeps its pre-existing shape [N, 3] and its
         pre-existing value (the nominal/base-pose array). Every existing
         consumer -- the plotters in exporter.py, save_all_figures, plot_total,
         the validation metadata dict -- reads that attribute and would silently
@@ -680,7 +680,7 @@ class CIRSimulator:
         return self.ego_pose_log[frame_idx]
 
     def _radar_origin_at_frame(self, frame_idx: int) -> np.ndarray:
-        """Radar body origin at one slow-time sample, shape[3].
+        """Radar body origin at one slow-time sample, shape [3].
 
         Reference point for target phi/theta and distance_center_m in the
         ground truth. Returns the exact same array as _radar_origin() when
@@ -760,7 +760,7 @@ class CIRSimulator:
             # Numeric values are injected in _update_derived_hardware_params().
             self.cfg.leakage.enable_tx_rx_feedthrough = True
             self.cfg.leakage.enable_tx_rx_feedthrough_ringing = True
-            self.cfg.leakage.enable_radiation_leakage = True
+            self.cfg.leakage.enable_radiation_leakage = False
             self.cfg.leakage.enable_pcb_leakage = False
             self.cfg.leakage.enable_early_leakage = False
 
@@ -768,7 +768,7 @@ class CIRSimulator:
             self.cfg.frontend.enable_quantization = True
             self.cfg.frontend.enable_frame_drift = True
 
-            # Match the measured UA200 RX gains used in the fit (gain_deembeded domain)
+            # Match the measured UA200 RX gains used in the fit (gain_deembedded domain)
             self.cfg.radar.rx1_gain = 29
             self.cfg.radar.rx2_gain = 74
 
@@ -790,7 +790,7 @@ class CIRSimulator:
             self.cfg.frontend.enable_frame_drift = False
 
         else:
-            raise ValueError("Unsupported hardware_profile")
+            raise ValueError("Unsupported hardware_profile.")
 
     
     def _update_derived_hardware_params(self):
@@ -807,16 +807,16 @@ class CIRSimulator:
         profile = (self.cfg.hardware_profile or "").strip().lower()
 
         if profile == "measured_case0":
-            # Measurement-fitted constants from case0_params.json
+            # Measurement-fitted constants from case0_params.json.
             # These bypass formula derivation entirely.
             self._inject_measured_case0_params()
             return
 
         if profile == "fitted":
-            # Config-driven fitted profile: inejct values from the JSON fit and
+            # Config-driven fitted profile: inject values from the JSON fit and
             # bypass formula derivation (same overwrite-trap avoidance as
             # measured_case0 above).
-            self._inject_measured_from_json(self.cfg.hardware_params_json)
+            self._inject_params_from_json(self.cfg.hardware_params_json)
             return
 
         if self.cfg.leakage.enable_radiation_leakage:
@@ -846,10 +846,10 @@ class CIRSimulator:
                 pcb_base *= 1.20
 
             gain_factor = 1.0 + max(avg_rx_gain - 30.0, 0.0) / 70.0
-            pcb = pcb_base + gain_factor
+            pcb = pcb_base * gain_factor
             pcb = float(np.clip(pcb, 0.01, 0.08))
 
-            tx_idx = 1 # antenna 1 in code = RX2 + TX
+            tx_idx = 1  # antenna 1 in code = RX2 + TX
 
             if tx_idx == 1:
                 self.cfg.leakage.pcb_leakage_factor_12 = pcb * 1.40
@@ -878,7 +878,7 @@ class CIRSimulator:
             self.cfg.leakage.tx_antenna_index = 1
 
             # RX1 only: receives coupled TX leakage from antenna 2
-            self.cfg.leakage.tx_rx_feedthrough_amp_ant0 = base_tx_leak * 0.05
+            self.cfg.leakage.tx_rx_feedthrough_amp_ant0 = base_tx_leak * 0.85
 
             # RX2 + TX: strongest self-leakage should be here
             self.cfg.leakage.tx_rx_feedthrough_amp_ant1 = base_tx_leak * 1.35
@@ -899,10 +899,10 @@ class CIRSimulator:
 
         if self.cfg.leakage.enable_early_leakage:
             sic_factor = 0.55 if self.cfg.radar.sic_enable == 1 else 1.0
-            qunat_factor = 1.05 if self.cfg.frontend.enable_quantization else 1.0
+            quant_factor = 1.05 if self.cfg.frontend.enable_quantization else 1.0
             drift_factor = 1.05 if self.cfg.frontend.enable_frame_drift else 1.0
 
-            base_early = 0.18 * sic_factor * qunat_factor * drift_factor
+            base_early = 0.18 * sic_factor * quant_factor * drift_factor
 
             profile = (self.cfg.hardware_profile or "").strip().lower()
             if profile == "strong_coupling_board":
@@ -931,7 +931,7 @@ class CIRSimulator:
 
         Fitted from data/cir/260701/case0.log (UA200, gain_deembedded domain).
         Values are taken directly from the least-squares fit - no formula
-        derivation. See CIRgenerator/notebooks/impairments_fitting.ipynb.
+        derivation.  See CIRgenerator/notebooks/impairments_fitting.ipynb.
         """
         L = self.cfg.leakage
 
@@ -958,7 +958,7 @@ class CIRSimulator:
         L.tx_rx_feedthrough_ringing_offset_amp_ant0 = 3.5088542773064533
         L.tx_rx_feedthrough_ringing_offset_amp_ant1 = 0.006636360102148943
         L.tx_rx_feedthrough_ringing_offset_phase_ant0_rad = -2.9313885808115003
-        L.tx_rx_feedthrough_ringing_offset_phase_ant1_rad = -2.8396192473663284
+        L.tx_rx_feedthrough_ringing_offset_phase_ant1_rad = -2.839619247363284
         L.tx_rx_feedthrough_ringing_amp_ant0 = 2.765879047851826
         L.tx_rx_feedthrough_ringing_amp_ant1 = 0.0006210878436960386
         L.tx_rx_feedthrough_ringing_decay_ant0 = 0.33189529393814926
@@ -983,33 +983,34 @@ class CIRSimulator:
         # -- Frame drift --
         self.cfg.frontend.frame_amplitude_drift_std = 0.01060406502213973
         self.cfg.frontend.frame_phase_drift_std = [0.001476754146717064, 0.0021325951570907754]
+        self.cfg.frontend.frame_timing_jitter_std_bins = 0.0
 
         # -- Quantization (gain_deembedded domain) --
-        self.cfg.frontend.quantization_dc_offset_i = -15.1645897099756694
+        self.cfg.frontend.quantization_dc_offset_i = -15.164589709756694
         self.cfg.frontend.quantization_dc_offset_q = -9.62612113856849
         # Derive bits/full_scale from step and full_scale_est in the fit
         q_step = 0.0001989999999999978
         q_full_scale_est = 318.1890529906708
         q_max_level = q_full_scale_est / q_step
         import math as _math
-        self.cfg.frontend.quantization_bits = int(np.clip(np.ceil(np.log2(q_max_level + 1)) + 1, 4, 6))
+        self.cfg.frontend.quantization_bits = int(np.clip(np.ceil(np.log2(q_max_level + 1)) + 1, 4, 16))
         self.cfg.frontend.quantization_full_scale = q_full_scale_est
 
         # -- Optional impairments (off for measured preset) --
         self.cfg.optional.enable_gain_mismatch = False
         self.cfg.optional.enable_phase_mismatch = False
 
-    def _inject_measured_from_json(self, path: str):
+    def _inject_params_from_json(self, path: str):
         """Load a case*_params.json fit and inject it via the shared injector.
 
-        Used by the config-driven ``hardware_profile == "fitted"``. Reuse the
+        Used by the config-driven ``hardware_profile == "fitted"``. Reuses the
         exact field injection of 
-        ``validation/cir_validation_adapter.build._injected_simulator`` through
+        ``validation/cir_validation_adapter.build_injected_simulator`` through
         ``impairment_params.apply_case_params_to_cfg``.
 
         A relative ``path`` is resolved against the project root (the parent of
         this CIRgenerator package) so it works regardless of CWD. Guards:
-            * fit ``num_antennas`` must match ``cfg.num_anteanns`` (hard error);
+            * fit ``num_antennas`` must match ``cfg.num_antennas`` (hard error);
             * a ``num_taps`` mismatch vs ``cfg.cir.num_bins`` is warned but
               ``cfg.cir.num_bins`` stays authoritative (the tap-indexed
               feedthrough/ringing params assume the fit's tap grid).
@@ -1031,10 +1032,10 @@ class CIRSimulator:
 
         meta = case_params.get("meta", {})
         fit_antennas = meta.get("num_antennas")
-        if fit_antennas is not None and int(fit_antennas) != self.cfg.num_anteanns:
+        if fit_antennas is not None and int(fit_antennas) != self.cfg.num_antennas:
             raise ValueError(
                 f"hardware_params_json num_antennas ({fit_antennas}) != "
-                f"cfg.mnum_antennas ({self.cfg.num_anteanns}): {json_path}"
+                f"cfg.mnum_antennas ({self.cfg.num_antennas}): {json_path}"
             )
 
         fit_taps = meta.get("num_taps")
@@ -1042,7 +1043,7 @@ class CIRSimulator:
             print(
                 f"[CIRSimulator] WARNING: hardware_params_json was fit at "
                 f"num_taps={fit_taps} but cfg.cir.num_bins={self.cfg.cir.num_bins}; "
-                f"keeping cfg.cir.num_bins.  Tap-indexed impairments "
+                f"keeping cfg.cir.num_bins. Tap-indexed impairments "
                 f"(feedthrough/ringing start_tap/num_taps) assume the fit's tap grid."
             )
 
@@ -1072,7 +1073,7 @@ class CIRSimulator:
             self.cfg.scene.enable_default_room_clutter = True
 
             wooden_table = StaticClutterPath(
-                    name = "table_front",
+                    name="table_front",
                     position_xy_m=(1.35, 0.0),
                     amplitude=0.12,
                     width_m=0.5,
@@ -1104,7 +1105,7 @@ class CIRSimulator:
             self.cfg.static_clutter.append(metal_shelf)
 
         else:
-            raise ValueError("Unsupported room_profile")
+            raise ValueError("Unsupported room_profile.")
 
     def _apply_target_profile(self):
         """
@@ -1376,8 +1377,8 @@ class CIRSimulator:
         (x, y) inputs to 3D (z=0.0) automatically.
 
         Args:
-            target_pos (np.ndarray): target's position from whith to calculate the norm
-            antenna_pos (np.ndarray): antennas position from whith to calculate the norm
+            target_pos (np.ndarray): target's position from which to calculate the norm
+            antenna_pos (np.ndarray): antennas position from which to calculate the norm
 
         Returns:
             float: value of the distance
@@ -1400,14 +1401,14 @@ class CIRSimulator:
                         * (sqrt(Rt*Rr) / d0)**-(n - 2.0)
 
         Derivation: the radar equation gives received POWER
-        Pr/Pt ~ sigman / (Rt**2 * Rr**2); the CIR tap is a complex VOLTAGE
+        Pr/Pt ~ sigma / (Rt**2 * Rr**2); the CIR tap is a complex VOLTAGE
         transfer coefficient (|h|**2 == power), so |h| ~ sqrt(Pr/Pt)
         ~ sqrt(sigma) / (Rt*Rr), with the free-space aperture term
         contributing lambda_m**1 (NOT lambda_m**2) and the normalisation
         (4*pi)**1.5.
 
         Monostatic (collocated TX/RX, Rt == Rr == d) reduces exactly to
-        lambda_m*sqrt(sigma) / ((4*pi)**1.5 * d**2), i.e. amplitdue ~ d**-2.
+        lambda_m*sqrt(sigma) / ((4*pi)**1.5 * d**2), i.e. amplitude ~ d**-2.
         TX and RX are collocated by construction in this engine (both derive
         from self.antenna_positions[ant_idx]), so both call sites currently
         pass Rt == Rr; the bistatic signature is kept so a future distinct TX
@@ -1416,9 +1417,9 @@ class CIRSimulator:
         NOTE: this replaced a one-way Friis POWER term
         (lambda_m/(4*pi*d))**2, which had the right d exponent for the wrong
         reason (a squared one-way term rather than a product of two one-way
-        volatage terms) and the wrong wavelength exponent (lambda**2). At the
+        voltage terms) and the wrong wavelength exponent (lambda**2). At the
         default carrier frequency with sigma = 1 m^2 the new law reproduces the
-        old absolute amplitude, because path_loss_Ref_gain was recalibrated
+        old absolute amplitude, because path_loss_ref_gain was recalibrated
         alongside it - see docs/friis_path_loss_model.md.
 
         The excess-loss exponent is unchanged in meaning: n == 2.0 is the exact
@@ -1428,12 +1429,12 @@ class CIRSimulator:
 
         Uses the same self.lambda_m as the phase term (no second frequency
         knob). The max(d, path_loss_floor_m) clamp is a non-physical
-        sigularity guard inherited from the legacy inline max(d, 0.1); it
+        singularity guard inherited from the legacy inline max(d, 0.1); it
         bounds the d -> 0 divergence and is NOT a near-field model.
 
         Args:
             d_tx_m (float): TX-to-scatterer distance Rt, metres.
-            d_rx_m (float): scatterer-to_RX distance Rr, metres.
+            d_rx_m (float): scatterer-to-RX distance Rr, metres.
             rcs_m2 (float): radar cross-section sigma, square metres.
             path_loss_exp (float): exponent n (2.0 = exact radar equation;
                 >2.0 = extra excess loss beyond path_loss_ref_distance_m).
@@ -1466,7 +1467,7 @@ class CIRSimulator:
         Then optionally apply a small pulse-spreading kernel so the energy
 
         Args:
-            cir_vectors (np.ndarray): CIR array.
+            cir_vector (np.ndarray): CIR array.
             bin_idx (float): BIN index.
             value (complex): value to deposit in the bins.
 
@@ -1486,7 +1487,7 @@ class CIRSimulator:
         
         kernel = np.array(self.cfg.frontend.pulse_spread_kernel, dtype=float)
 
-        #Normalize kernel so energy stays controlled
+        # Normalize kernel so energy stays controlled
         kernel_sum = np.sum(kernel)
         if kernel_sum <= 0:
             kernel = np.array([1.0], dtype=float)
@@ -1495,7 +1496,7 @@ class CIRSimulator:
 
         center = len(kernel) // 2
 
-        # Split between 10 and i1 first, then spread each part
+        # Split between i0 and i1 first, then spread each part
         for base_idx, base_weight in [(i0, 1.0 - frac), (i1, frac)]:
             base_value = value * base_weight
 
@@ -1549,11 +1550,11 @@ class CIRSimulator:
 
         Returns:
             amp_scale (float): common amplitude scaling for this frame.
-            phase_ant (float): small phase drift for antenna.
+            phase_ant (float): small phase drift for antenna
             timing_jitter_bins (float): small common delay jitter in bins.
         """
         if not self.cfg.frontend.enable_frame_drift:
-            return 1.0, [0.0] * self.cfg.num_anteanns, 0.0 # bug fix: parameter unpack error [KMG, 260616]
+            return 1.0, [0.0] * self.cfg.num_antennas, 0.0 # bug fix: parameter unpack error [KMG, 260616]
 
         amp_scale = 1.0 + self.rng.normal(0.0, self.cfg.frontend.frame_amplitude_drift_std)
         timing_jitter_bins = self.rng.normal(0.0, self.cfg.frontend.frame_timing_jitter_std_bins)
@@ -1564,7 +1565,7 @@ class CIRSimulator:
 
         return amp_scale, phase_ant, timing_jitter_bins
 
-    def _apply_adc_coupling(self, cir_frame: np.ndarray) -> np.ndarray:
+    def _apply_adc_clipping(self, cir_frame: np.ndarray) -> np.ndarray:
         """
         Simulate ADC compression + clipping.
 
@@ -1632,7 +1633,7 @@ class CIRSimulator:
             return out
 
         qmax = (2 ** (bits - 1)) - 1
-        qmin = (2 ** (bits - 1))
+        qmin = -(2 ** (bits - 1))
         
         # Quantization step
         step = full_scale / max(qmax, 1)
@@ -1683,12 +1684,12 @@ class CIRSimulator:
         sampled_pose it is whatever the trace holds at the first grid instant.
         """
 
-        # save targets lists
+        #save targets lists
         original_targets = self.cfg.targets
         self.cfg.targets = []
-        # empty rrom
+        #empty rrom
         baseline_frame, _ = self._generate_one_frame(frame_idx=0)
-        # restore targets
+        #restore targets
         self.cfg.targets = original_targets
 
         return baseline_frame
@@ -1802,7 +1803,7 @@ class CIRSimulator:
         Args:
             cir_frame (np.ndarray): CIR array.
         Returns:
-            (np.ndarray): tx-rx feedthrough
+            (np.ndarray): tx-rx feedthrough.
         """
         if not self.cfg.leakage.enable_tx_rx_feedthrough or cir_frame.shape[0] < 2:
             return cir_frame
@@ -1817,7 +1818,7 @@ class CIRSimulator:
             return out
 
         tx_idx = int(np.clip(self.cfg.leakage.tx_antenna_index, 0, num_ant - 1))
-        other_idx = 1 - tx_idx  # noqa: F841
+        other_idx = 1 - tx_idx
 
         # Per-tap phase slope of the feedthrough (structured-schema fit). Defaults
         # to 0.0 so every non-structured caller is byte-identical to before.
@@ -1857,13 +1858,13 @@ class CIRSimulator:
     def _apply_tx_rx_feedthrough_ringing(self, cir_frame: np.ndarray) -> np.ndarray:
         """
         Simulate the damped ringing tail that follows the main TX-RX
-        feedthrough peak (mathced-filter / pulse-shaping ringing), independent
+        feedthrough peak (matched-filter / pulse-shaping ringing), independent
         of target reflection or antenna-to-antenna radiation coupling.
 
         Model per antenna:
             S[a,k] = offset_amp_a * exp(j*offset_phase_a)
                    + ring_amp_a * decay_a**k * exp(j*(ring_phase_a + freq_a*k))
-        where k. is measured from tx_rx_feedthrough_ringing_start_tap.
+        where k is measured from tx_rx_feedthrough_ringing_start_tap.
 
         Args:
             cir_frame (np.ndarray): CIR array.
@@ -1915,7 +1916,7 @@ class CIRSimulator:
 
     def _apply_early_leakage(self, cir_frame: np.ndarray) -> np.ndarray:
         """
-        Simulate structured early-chip leakage caused by antenna coupling.
+        Simulate structured early-tap leakage caused by antenna coupling.
         front-end leakage, PCB/internal ringing, or direct TX-RX feedthrough.
 
         This effect appears at the beginning of the CIR and does NOT
@@ -1941,7 +1942,6 @@ class CIRSimulator:
         out = cir_frame.copy()
 
         n_taps = min(int(self.cfg.leakage.early_leakage_num_taps), num_bins)
-        # for antenna_index in rage(num_ant):
         for tap in range(n_taps):
             weight0 = self.cfg.leakage.early_leakage_decay_ant0 ** tap
             ripple0 = 1.0 + self.cfg.leakage.early_leakage_ripple_amp_ant0 * np.cos(
@@ -1981,9 +1981,9 @@ class CIRSimulator:
         Returns:
             Tuple: CIR for the frame and ground_truth dictionary.
         """
-        num_bins = self.cfg.cir.num_bins  # noqa: F841
+        num_bins = self.cfg.cir.num_bins
 
-        cir_frame = np.zeros((self.cfg.num_anteanns, self.cfg.cir.num_bins), dtype=np.complex128)
+        cir_frame = np.zeros((self.cfg.num_antennas, self.cfg.cir.num_bins), dtype=np.complex128)
         ground_truth = []
 
         frame_amp_scale, frame_phase_ant, frame_timing_jitter = self._get_frame_drift_params()
@@ -2028,7 +2028,7 @@ class CIRSimulator:
             # sqrt(sigma/N) via _radar_equation_amplitude_factor. This keeps the
             # incoherent (energy) sum equal to sigma regardless of N -- RCS is an
             # energy-like quantity. The previous 1/N AMPLITUDE normalisation made
-            # total energt fall as 1/N, so a finely-discertised target was
+            # total energy fall as 1/N, so a finely-discertised target was
             # silently dimmer than a coarse one.
             rcs_share_m2 = collider.rcs_m2 / max(len(scatter_points), 1)
 
@@ -2037,7 +2037,7 @@ class CIRSimulator:
 
                     d_direct = self._distance(scatter_pt, ant_pos)
                     # TODO: replace monostatic approximation with bistatic
-                    # TX->scatter->Rx path in a later step.
+                    # TX->scatter->RX path in a later step.
                     round_trip_direct = 2.0 * d_direct
 
                     pattern_gain = self.cfg.antenna._antenna_pattern_gain(ant_pos, scatter_pt, ant_idx=ant_idx)
@@ -2060,7 +2060,7 @@ class CIRSimulator:
                     direct_sample = (direct_amp * frame_amp_scale) * np.exp(1j * direct_phase)
                     direct_sample = self._apply_antenna_impairments(ant_idx, direct_sample)
 
-                    direct_bin = self._distance_to_bin(round_trip_direct) + frame_timing_jitter # remove workaround version. roll-back to round-trip distance [KMG, 260616]
+                    direct_bin = self._distance_to_bin(round_trip_direct) + frame_timing_jitter
                     self._deposit_fractional_bin(cir_frame[ant_idx], direct_bin, direct_sample)
 
                     for refl in collider.reflections:
@@ -2099,28 +2099,28 @@ class CIRSimulator:
 
         # Apply RX gain after propagation/leakage effects
         cir_frame = self._apply_rx_gain(cir_frame)
-        cir_frame = self._apply_adc_coupling(cir_frame)
+        cir_frame = self._apply_adc_clipping(cir_frame)
 
         noise_std_per_ant = self.cfg.cir.noise_std_per_ant
         amp_proportional_factor = self.cfg.cir.noise_amp_proportional_factor
 
         if noise_std_per_ant is not None:
-            if len(noise_std_per_ant) != self.cfg.num_anteanns:
+            if len(noise_std_per_ant) != self.cfg.num_antennas:
                 raise ValueError(
                     f"cfg.cir.noise_std_per_ant has {len(noise_std_per_ant)} values, "
-                    f"expected {self.cfg.num_anteanns} (cfg.num_antennas)."
+                    f"expected {self.cfg.num_antennas} (cfg.num_antennas)."
                 )
-            if amp_proportional_factor is not None and len(amp_proportional_factor) != self.cfg.num_anteanns:
+            if amp_proportional_factor is not None and len(amp_proportional_factor) != self.cfg.num_antennas:
                 raise ValueError(
                     f"cfg.cir.noise_amp_proportional_factor has {len(amp_proportional_factor)} values, "
-                    f"expected {self.cfg.num_anteanns} (cfg.num_antennas)."
+                    f"expected {self.cfg.num_antennas} (cfg.num_antennas)."
                 )
             noise_real = np.empty_like(cir_frame, dtype=float)
             noise_imag = np.empty_like(cir_frame, dtype=float)
             for ant, std in enumerate(noise_std_per_ant):
                 std = max(std, 1e-6)    # same tiny-noise floor as the scalar-off branch below
                 if amp_proportional_factor is not None:
-                    # sigma[k] = sqrt(flat_std**2 + (factor * |cir_frame[ant, k]|)**2):
+                    # sigma[k] = sqrt(flat_std**2 + (factor * |cir_frame[ant,k]|)**2):
                     # models frame-to-frame fluctuation that scales with tap
                     # amplitude (e.g. TX-RX feedthrough/ringing tail), on top of
                     # the existing flat noise floor.
@@ -2152,10 +2152,10 @@ class CIRSimulator:
         else:
             noise_real = self.rng.normal(0, 1e-6, size=cir_frame.shape)
             noise_imag = self.rng.normal(0, 1e-6, size=cir_frame.shape)
-        for ant in range(self.cfg.num_anteanns):
+        for ant in range(self.cfg.num_antennas):    #robustness for various number of antennas
             cir_frame[ant] += noise_real[ant] + 1j * noise_imag[ant]
 
-        # this could hide some information so is diabled
+        #this could hide some information so is disabled
         # cir_frame = self._apply_quantization(cir_frame)
 
         return cir_frame, ground_truth
@@ -2177,7 +2177,7 @@ class CIRSimulator:
 
         num_frames = self.cfg.cir.num_frames
         M = 2.5
-        cir_data = np.zeros((num_frames, self.cfg.num_anteanns, self.cfg.cir.num_bins), dtype=np.complex128)
+        cir_data = np.zeros((num_frames, self.cfg.num_antennas, self.cfg.cir.num_bins), dtype=np.complex128)
         truth = []
 
         baseline_frame = None
@@ -2188,10 +2188,10 @@ class CIRSimulator:
         for frame_idx in range(num_frames):
             cir_frame, frame_truth = self._generate_one_frame(frame_idx)
 
-            # this will substract the environment from the detection
+            #this will substract the environment from the detection
             if self.cfg.enable_baseline_subtraction and baseline_frame is not None:
-                cond = np.abs(cir_frame - baseline_frame)/np.abs(baseline_frame) > M
-                cir_frame = np.where(cond, cir_frame, 0)
+                cond = (cir_frame - baseline_frame)/baseline_frame > M
+                cir_frame =  np.where(cond, cir_frame, 0)
 
             cir_data[frame_idx] = cir_frame
             truth.append(frame_truth)
@@ -2224,7 +2224,7 @@ if __name__ == "__main__":
     # "moving_object"
     # "metal_false_reflector"
     # "human_vs_object" mixed
-    # "empty"abs
+    # "empty"
 
     cfg.scenario_name = "moving_object_real_room"
     cfg.hardware_profile = "ua200_realistic_v1"
@@ -2295,7 +2295,7 @@ if __name__ == "__main__":
         cfg,
         simulator.antenna_positions,
         radius_m=3.0,
-        title="Dual Antenna Coverate (Cartesian)",
+        title="Dual Antenna Coverage (Cartesian)",
         show=False,
     )
 
@@ -2321,7 +2321,7 @@ if __name__ == "__main__":
         cfg,
         angle_min_deg=-90,
         angle_max_deg=90,
-        title="Phase Difference vs AoA (19mm spacing)",
+        title="Phase Difference vs AoA (19 mm spacing)",
         show=False,
     )
 
@@ -2343,7 +2343,7 @@ if __name__ == "__main__":
         simulator.antenna_positions,
         frame_idx=0,
         title=f"Level {SELECTED_LEVEL} - Target Width / Scatter Points",
-        show = True,
+        show=True,
     )
 
     plot_tap_over_time(
