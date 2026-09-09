@@ -1,0 +1,5 @@
+# Radar replay pipeline - runtime dependencies
+# Third-party imports found across CIRgenerator/, MX_CodeV1_Mustafa/, radar_wrapper/
+numpy
+scipy
+matplotlib

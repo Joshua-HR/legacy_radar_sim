@@ -1,0 +1,276 @@
+{
+    "source_log": "/home/",
+    "meta": {
+        "num_frames": 1000,
+        "num_antennas": 2,
+        "num_taps": 16,
+        "bin_time_s": 1.0016025641025641e-09,
+        "pri_s": 0.02,
+        "fit_domain": "gain_deembedded"
+    },
+    "gain_deembedding": {
+        "rx_gain_db": [
+            29.0,
+            74.0
+        ],
+        "rx_gain_linear": [
+            28.183829312644534,
+            5011.872336272725
+        ],
+        "deembed_domain": "cube_deemb = cube_raw / rx_gain_linear_per_antenna",
+        "gain_db_assumption": "amplitude_dB"
+    },
+    "tx_rx_feedthrough": {
+        "num_taps": 4,
+        "start_tap": 0,
+        "amp_ant0": 290.43584568327066,
+        "amp_ant1": 0.684880985144706,
+        "decay_ant0": 0.5654203962022762,
+        "decay_ant1": 0.8586017475706783,
+        "phase_ant0_rad": -0.16853981488665049,
+        "phase_ant1_rad": 0.12327156023883962,
+        "ripple_amp_ant0": 0.09021638811323586,
+        "ripple_amp_ant1": 0.6565923861882522,
+        "ripple_freq_ant0": 1.6727462757497606,
+        "ripple_freq_ant1": 1.1081371281185481,
+        "fit_domain": "gain_deembedded",
+        "fit_used_noise_debias": true,
+        "noise_std_used_ant0": 0.010242580289304417,
+        "noise_std_used_ant1": 5.759826173255991e-05
+    },
+    "tx_rx_feedthrough_ringing": {
+        "start_tap": 4,
+        "num_taps": 12,
+        "offset_amp_ant0": 3.3254643591651347,
+        "offset_amp_ant1": 0.006430904834748216,
+        "offset_phase_ant0_rad": -2.9325140903463978,
+        "offset_phase_ant1_rad": -2.7132842799158547,
+        "ring_amp_ant0": 13.792391256124336,
+        "ring_amp_ant1": 0.025609079986548027,
+        "ring_decay_ant0": 0.19715973240926996,
+        "ring_decay_ant1": 0.24764786628358662,
+        "ring_phase_ant0_rad": -0.4921017155813954,
+        "ring_phase_ant1_rad": 0.24011639200013604,
+        "ring_freq_ant0": -0.06351307436115197,
+        "ring_freq_ant1": 0.27412190749829746,
+        "fit_domain": "gain_deembedded",
+        "rel_err_mean_ant0": 0.07297865284833431,
+        "rel_err_mean_ant1": 0.39901026115565186
+    },
+    "radiation_leakage": {
+        "factor_12": 0.0,
+        "factor_21": 0.0,
+        "factor_12_raw": 484.171044952964,
+        "factor_21_raw": 0.0016345225971382985,
+        "phase_offset_12_rad": -0.5253916281644277,
+        "phase_offset_21_rad": 0.5253916281644277,
+        "reliable_12": false,
+        "reliable_21": false,
+        "ref_amp_over_noise_12": 125.57273713690246,
+        "ref_amp_over_noise_21": 379.13520795957083,
+        "delay_bins": 4,
+        "fit_domain": "gain_deembedded"
+    },
+    "noise_std": 0.005150089275518488,
+    "noise": {
+        "domain": "gain_deembedded_fixed_point",
+        "std_per_ant": [
+            0.010242580289304417,
+            5.759826173255991e-05
+        ],
+        "std_ant0": 0.010242580289304417,
+        "std_ant1": 5.759826173255991e-05,
+        "std_mean": 0.005150089275518488,
+        "std_raw_per_ant": [
+            0.2886751345948129,
+            0.2886751345948129
+        ],
+        "raw_quant_step_per_ant": [
+            1.0,
+            1.0
+        ],
+        "quant_floor_deembedded_per_ant": [
+            0.010242580289304417,
+            5.759826173255991e-05
+        ],
+        "rx_gain_db": [
+            29.0,
+            74.0
+        ],
+        "rx_gain_linear": [
+            28.183829312644534,
+            5011.872336272725
+        ],
+        "estimation": {
+            "ant0": {
+                "rx_gain_db": 29.0,
+                "rx_gain_linear": 28.183829312644534,
+                "noise_taps": [
+                    5,
+                    6,
+                    14,
+                    15
+                ],
+                "median_abs_threshold_raw": 82.60677773455141,
+                "raw_quant_step": 1.0,
+                "raw_quant_floor_std": 0.2886751345948129,
+                "noise_std_raw_before_floor": 0.0,
+                "noise_std_raw_re_before_floor": 0.0,
+                "noise_std_raw_im_before_floor": 0.0,
+                "noise_std_raw_after_floor": 0.2886751345948129,
+                "noise_std_deembedded": 0.010242580289304417,
+                "quant_floor_deembedded": 0.010242580289304417,
+                "method": "raw_frame_diff_low_magnitude_taps",
+                "include_quant_floor": true
+            },
+            "ant1": {
+                "rx_gain_db": 74.0,
+                "rx_gain_linear": 5011.872336272725,
+                "noise_taps": [
+                    5,
+                    14,
+                    6,
+                    13
+                ],
+                "median_abs_threshold_raw": 30.056088410413413,
+                "raw_quant_step": 1.0,
+                "raw_quant_floor_std": 0.2886751345948129,
+                "noise_std_raw_before_floor": 0.0,
+                "noise_std_raw_re_before_floor": 0.0,
+                "noise_std_raw_im_before_floor": 0.0,
+                "noise_std_raw_after_floor": 0.2886751345948129,
+                "noise_std_deembedded": 5.759826173255991e-05,
+                "quant_floor_deembedded": 5.759826173255991e-05,
+                "method": "raw_frame_diff_low_magnitude_taps",
+                "include_quant_floor": true
+            }
+        },
+        "residual_check": {
+            "domain": "gain_deembedded",
+            "tail_start": 8,
+            "std_per_ant_residual_tail": [
+                0.015887049449506786,
+                8.983262068809356e-05
+            ],
+            "std_mean_residual_tail": 0.00798844103509744
+        },
+        "amp_proportional_factor_per_ant": [
+            0.006209771544973582,
+            0.01910094272368569
+        ],
+        "amp_proportional_fit": {
+            "ant0": {
+                "factor": 0.006209771544973582,
+                "candidate_taps": [
+                    4,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    13
+                ],
+                "excluded_low_amp_taps": [
+                    5,
+                    6,
+                    14,
+                    15
+                ],
+                "ratio_per_candidate_tap": [
+                    0.0022361552890107004,
+                    0.008513850405438913,
+                    0.006263436831194768,
+                    0.005135639272138165,
+                    0.006151600792578619,
+                    0.0075084793728175826,
+                    0.006348703879007743,
+                    0.006156106258752396
+                ],
+                "fit_domain": "gain_deembedded"
+            },
+            "ant1": {
+                "factor": 0.01910094272368569,
+                "candidate_taps": [
+                    4,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12,
+                    15
+                ],
+                "excluded_low_amp_taps": [
+                    5,
+                    6,
+                    13,
+                    14
+                ],
+                "ratio_per_candidate_tap": [
+                    0.008561189150917305,
+                    0.020254747742734384,
+                    0.01921902967944199,
+                    0.018982855767929387,
+                    0.014141410947097784,
+                    0.016267101898092846,
+                    0.021331582983908276,
+                    0.020493192717253042
+                ],
+                "fit_domain": "gain_deembedded"
+            }
+        }
+    },
+    "frame_drift": {
+        "amplitude_drift_std": 0.00064416462280354,
+        "phase_drift_std": [
+            0.0014613238215153148,
+            0.0012240906015891723
+        ],
+        "timing_jitter_std_bins": 0.0
+    },
+    "quantization": {
+        "raw": {
+            "step": 1.0,
+            "dc_offset_i": -79.07317927170868,
+            "dc_offset_q": -261.56661414565826,
+            "full_scale_set": 8967.785958641072,
+            "domain": "raw_fixed_point"
+        },
+        "gain_deembedded": {
+            "step": 0.0001989999999999978,
+            "dc_offset_i": -15.165516272472743,
+            "dc_offset_q": -9.62912444626696,
+            "full_scale_set": 317.4985356548805,
+            "domain": "gain_deembedded"
+        }
+    },
+    "self_check_report": {
+        "logmag_RMSE_static_profile": {
+            "ant0": 0.04299879188598593,
+            "ant1": 0.10018466608790996
+        },
+        "logmag_RMSE_frame_std_profile": {
+            "ant0": 0.504153633878537,
+            "ant1": 0.6396285512420511
+        },
+        "amp_scale_std": {
+            "measured": 0.00064416462280354,
+            "sim": 0.0034146323011668674
+        },
+        "peak_tap_std": {
+            "measured": 0.0,
+            "sim": 0.0
+        },
+        "phase_drift_std": {
+            "measured": 0.0014613238215153148,
+            "sim": 0.006070146177390163
+        },
+        "tier_a_rmse_threshold": 1.5,
+        "tier_a_rmse_ok": true,
+        "tier_a_amp_vs_noise_ok": true,
+        "tier_a_pass": true,
+        "fit_quality_flag": "tier_a_pass"
+    },
+    "fit_quality_flag": "tier_a_pass"
+}
