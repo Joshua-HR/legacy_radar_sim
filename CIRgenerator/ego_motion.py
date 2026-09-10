@@ -20,11 +20,11 @@ CIRSimulator._generate_one_frame(). Doppler is therefore a *derived*
 diagnostic of the time-varying total path length -- it is never multiplied in
 as a separate phase term (no double application).
 
-Convenctions
+Conventions
 ------------
 * Right-handed coordinates, +Z up, SI units internally, unit suffixes on all
   field names (position_m, frequency_hz, rotation_rad, ...).
-* Quaternions are scalar-first ``[w, x, y, z]```, active local-to-parent
+* Quaternions are scalar-first ``[w, x, y, z]``, active local-to-parent
   (body-to-world), composed with the Hamilton product.
 * Angles reported to the antenna-pattern layer keep this project's existing
   HFSS-style convention (phi = azimuth, theta = polar angle from +Z); this
@@ -43,7 +43,7 @@ Motion types
                            from K sinusoidal components per axis.
 
 Out of scope by design (do not add here): constant-velocity radar translation
-(express it as a sampled_pose CSV), rotation-only/sacn/circular/waypoint-spline
+(express it as a sampled_pose CSV), rotation-only/scan/circular/waypoint-spline
 motion, acceleration or angular-rate dynamics, IMU noise, measured tremor
 statistics, visibility/occlusion, NLOS multipath.
 """
@@ -103,16 +103,16 @@ IDENTITY_QUAT_WXYZ: Tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
 
 
 def quat_normalize(q) -> np.ndarray:
-    """Normalize a scale_first quaternion to unit norm.
+    """Normalize a scalar-first quaternion to unit norm.
 
     Args:
         q: array-like [w, x, y, z].
     
     Returns:
-        np.ndarray shape [4], unit form, float64.
+        np.ndarray shape [4], unit norm, float64.
     
     Raises:
-        ValueError: if q is not length 4, is non-finite, or has zero sum
+        ValueError: if q is not length 4, is non-finite, or has zero norm
     """
     arr = np.asarray(q, dtype=float).reshape(-1)
 
@@ -128,7 +128,7 @@ def quat_normalize(q) -> np.ndarray:
     return arr / norm
 
 
-def quat_multiply(a, b) ->  np.ndarray:
+def quat_multiply(a, b) -> np.ndarray:
     """Hamilton product ``a (x) b`` of two scalar-first quaternions.
 
     With the active local-to-parent convention this composes rotations as
@@ -183,10 +183,10 @@ def quat_from_rotation_vector(r_rad) -> np.ndarray:
 
     The rotation vector's direction is the rotation axis and its magnitude is
     the rotation angle in radians, so
-    ``q = [cos(|r|/2), sine(|r|/2) * r/|r|]``. This is the only rotation
+    ``q = [cos(|r|/2), sin(|r|/2) * r/|r|]``. This is the only rotation
     accumulation path used by this module -- Euler-angle accumulation is
     deliberately NOT supported, because summing Euler angles is not a group
-    operation oon SO(3) and would drift for a multi-axis tremor.
+    operation on SO(3) and would drift for a multi-axis tremor.
 
     The ``sin(|r|/2)/|r| = 0.5 * sinc(|r|/(2*pi))`` form is exact at r == 0
     (numpy's sinc is the normalised sinc), so no small-angle branch is needed.
@@ -226,7 +226,7 @@ def quat_slerp_shortest(q0, q1, u: float) -> np.ndarray:
     Args:
         q0: array-like unit quaternion at u == 0.
         q1: array-like unit quaternion at u == 1.
-        u (flot): interpolation parameter in [0, 1].
+        u (float): interpolation parameter in [0, 1].
 
     Returns:
         np.ndarray shape [4], unit quaternion.
@@ -244,11 +244,11 @@ def quat_slerp_shortest(q0, q1, u: float) -> np.ndarray:
     if dot > SLERP_LINEAR_DOT_THRESHOLD:
         return quat_normalize(a + u * (b - a))
 
-    theta0 = float(np.arccos(dot))
-    sin_theta0 = float(np.sin(theta0))
+    theta_0 = float(np.arccos(dot))
+    sin_theta_0 = float(np.sin(theta_0))
 
-    s0 = float(np.sin((1.0 - u) * theta0)) / sin_theta0
-    s1 = float(np.sin(u * theta0)) / sin_theta0
+    s0 = float(np.sin((1.0 - u) * theta_0)) / sin_theta_0
+    s1 = float(np.sin(u * theta_0)) / sin_theta_0
 
     return quat_normalize(s0 * a + s1 * b)
 
@@ -305,7 +305,7 @@ class Pose:
         if not np.all(np.isfinite(p)):
             raise ValueError(f"Pose position has non-finite components: {p!r}")
 
-        return Pose(position_m, quaternion_wxyz=quat_normalize(quaternion_wxyz))
+        return Pose(position_m=p, quaternion_wxyz=quat_normalize(quaternion_wxyz))
     
     def rotation_matrix(self) -> np.ndarray:
         """Body-to-world rotation matrix, shape [3, 3]."""
@@ -373,7 +373,7 @@ def validate_slow_time_grid(slow_time_s) -> Tuple[np.ndarray, float]:
     """Validate the simulation slow-time grid and return (grid, interval).
 
     Required by every non-static motion type: at least two samples, finite,
-    strictly increasing, and uniformly spaced. Uniformly is what makes the
+    strictly increasing, and uniformly spaced. Uniformity is what makes the
     Nyquist gate and the RMS renormalisation well defined.
 
     Args:
@@ -449,9 +449,9 @@ class RadarMotion:
 
 
 class StaticMotion(RadarMotion):
-    """No ego motion: the base pose at every slow0time sample.
+    """No ego motion: the base pose at every slow-time sample.
 
-    The is the default (``[radar_motion]`` omitted) and is also what an
+    This is the default (``[radar_motion]`` omitted) and is also what an
     explicit ``type = static`` selects. CIRSimulator short-circuits on
     ``is_static`` and reuses its pre-computed antenna array object, so the
     legacy path generators run in the legacy order and the resulting CIR is
@@ -494,7 +494,7 @@ class SampledPoseMotion(RadarMotion):
 
     @property
     def domain_s(self) -> Tuple[float, float]:
-        """Closed trace domain [t_first, t_lat] in seconds."""
+        """Closed trace domain [t_first, t_last] in seconds."""
         return float(self._time_s[0]), float(self._time_s[-1])
 
     def assert_covers_grid(self, slow_time_s) -> None:
@@ -591,7 +591,7 @@ class HandheldJitterMotion(RadarMotion):
 
     Consequences, all deliberate:
         * The reported achieved RMS equals the configured RMS by construction.
-          It is a confirmation that renormalisation succeeded, NOT a measurment.
+          It is a confirmation that renormalisation succeeded, NOT a measurement.
         * That RMS is taken about the INITIAL pose, not about the series mean:
           ``sqrt(mean_n((delta_a(t_n) - delta_a(t_0))**2))`` with
           ``delta_a(t_0) == 0``.
@@ -600,7 +600,7 @@ class HandheldJitterMotion(RadarMotion):
           inside the requested band.
 
     NOTE: the reference implementation's prose carries a ``sqrt(2/K)``
-    normalisation factor that does not appear in its code. Renormalsation
+    normalisation factor that does not appear in its code. Renormalisation
     absorbs any such constant, so the output is identical either way; the code
     below follows the actual behaviour, not the prose. Do not reintroduce the
     literal.
@@ -652,7 +652,7 @@ class HandheldJitterMotion(RadarMotion):
             return idx
 
         raise ValueError(
-            f"handheld_jitter was precomputed on a fix slow-time grid of "
+            f"handheld_jitter was precomputed on a fixed slow-time grid of "
             f"{self._slow_time_s.shape[0]} samples at {self._snapshot_interval_s!r} s spacing; "
             f"it cannot be evaluated at slow_time_s={t!r}, which is not one of those samples. "
             f"The per-axis RMS renormalisation is grid-dependent, so re-evaluating off-grid "
@@ -687,9 +687,9 @@ class HandheldJitterMotion(RadarMotion):
                 float(v) for v in self._achieved_rotation_rms_local_rad
             ],
             "achieved_rms_definition": (
-                "sqrt(mean_n((delta_a(t_n) - deltal_a(t_0))**2)) with delta_a(t_0) == 0; "
+                "sqrt(mean_n((delta_a(t_n) - delta_a(t_0))**2)) with delta_a(t_0) == 0; "
                 "equals the configured RMS by construction (renormalisation confirmation, "
-                " not a measurement)"
+                "not a measurement)"
             ),
             "anchoring_note": (
                 "per-component -sin(phi) anchoring yields delta(t_0)=0 and introduces a DC "
@@ -723,7 +723,7 @@ class SingleToneMotion(RadarMotion):
     mirror/cancel presets express their sign (see build_radar_motion_from_profile).
 
     Closed form in t, so unlike HandheldJitterMotion it is not bound to the grid
-    it was constructed with and my be evaluated at any instant. The slow-time
+    it was constructed with and may be evaluated at any instant. The slow-time
     grid is still validated at construction, to gate the frequency against
     Nyquist.
 
@@ -817,10 +817,10 @@ class SingleToneMotion(RadarMotion):
             "phase_rad": self._phase_rad,
             "anchor_time_s": self._t0_s,
             "translation_amplitude_m": self._translation_amplitude_m,
-            "translation_dirction": [float(v) for v in self._translation_direction],
+            "translation_direction": [float(v) for v in self._translation_direction],
             "rotation_amplitude_rad": self._rotation_amplitude_rad,
             "rotation_axis": [float(v) for v in self._rotation_axis],
-            "amplitude_convection": "peak (NOT rms, unlike handheld_jitter)",
+            "amplitude_convention": "peak (NOT rms, unlike handheld_jitter)",
             "provenance": self._provenance,
         }
 
@@ -830,7 +830,7 @@ class SingleToneMotion(RadarMotion):
 # --------------------------------------------------------------------------
 
 #: Documented derivation string stored in the run metadata.
-EGO_SPEED_DERIVATION = (
+EGO_SEED_DERIVATION = (
     "numpy.random.Generator(PCG64(SeedSequence([random_seed, 0x45474F31]))); "
     "0x45474F31 is the fixed 'EGO1' tag. Consumes exactly one (K, 6) uniform "
     "phase draw in [0, 2*pi) and nothing else."
@@ -898,7 +898,7 @@ def resolve_trace_path(file_value: str, scenario_dir: Optional[Path]) -> Path:
 
     if not resolved.is_file():
         raise FileNotFoundError(
-            f"[radar_motion] e trace not found: {resolved} "
+            f"[radar_motion] sampled_pose trace not found: {resolved} "
             f"(from file = {raw!r}, resolved against {scenario_dir})"
         )
 
@@ -1087,7 +1087,7 @@ def build_handheld_jitter(
         raise ValueError(
             f"[radar_motion] handheld_jitter max_frequency_hz={f_max!r} Hz must be strictly below "
             f"the slow-time Nyquist frequency {nyquist_hz!r} Hz "
-            f"(snapshot interval) {snapshot_interval_s!r} s, i.e. [radar] period). "
+            f"(snapshot interval {snapshot_interval_s!r} s, i.e. [radar] period). "
             f"Lower max_frequency_hz or shorten the frame period."
         )
 
@@ -1096,11 +1096,11 @@ def build_handheld_jitter(
 
     for name, vec in (
         ("translation_rms_local_m", translation_rms),
-        ("rotation_rms_local_m", rotation_rms),
+        ("rotation_rms_local_rad", rotation_rms),
     ):
         if vec.shape[0] != 3:
             raise ValueError(
-                f"[radar_motion] {name} must be 3-vector, got {vec.shape[0]} components"
+                f"[radar_motion] {name} must be a 3-vector, got {vec.shape[0]} components"
             )
         if not np.all(np.isfinite(vec)):
             raise ValueError(f"[radar_motion] {name} has non-finite components: {vec!r}")
@@ -1140,7 +1140,7 @@ def build_handheld_jitter(
 
         if not np.isfinite(raw_rms) or raw_rms < MIN_ACHIEVABLE_RAW_RMS:
             raise ValueError(
-                f"[radar_motion] handheld_jitter axis {axis} has a positive configure RMS "
+                f"[radar_motion] handheld_jitter axis {axis} has a positive configured RMS "
                 f"({target_rms!r}) but its unnormalised synthesis RMS on this slow-time grid is "
                 f"{raw_rms!r}, so the requested RMS cannot be realised. This happens when the "
                 f"grid is too short relative to the requested band "
@@ -1163,7 +1163,7 @@ def build_handheld_jitter(
         achieved_rotation_rms_local_rad=achieved[3:6],
         requested_band_hz=(f_min, f_max),
         num_spectral_components=k_count,
-        seed_derivation=EGO_SPEED_DERIVATION,
+        seed_derivation=EGO_SEED_DERIVATION,
     )
 
 
@@ -1214,7 +1214,7 @@ def validate_ini_keys(motion_type: str, present_keys: Sequence[str]) -> None:
     """
     if motion_type not in _ALLOWED_KEYS:
         raise ValueError(
-            f"[{INI_SECTION}] unknown type = {motion_type!r}"
+            f"[{INI_SECTION}] unknown type = {motion_type!r}; "
             f"supported types are {', '.join(SUPPORTED_MOTION_TYPES)}"
         )
 
@@ -1272,10 +1272,10 @@ def build_radar_motion(
         motion_cfg: a dataconfig.RadarMotionConfig instance.
         slow_time_s: array-like [F], the simulation slow-time grid in seconds.
         random_seed (int): scenario random seed; the ego stream is derived from
-            it (see EGO_SPEED_DERIVATION) and consumes nothing from any other
+            it (see EGO_SEED_DERIVATION) and consumes nothing from any other
             stream.
         scenario_dir (Optional[Path]): directory of the scenario INI, used to
-            resolved a relative sampled_pose trace path.
+            resolve a relative sampled_pose trace path.
 
     Returns:
         RadarMotion: StaticMotion, SampledPoseMotion or HandheldJitterMotion.
@@ -1336,7 +1336,7 @@ def build_radar_motion(
 # The `mirror_`/`cancel_` presets are DERIVED: they read the resolved target's
 # own micro-motion parameters at build time, so they carry no duplicated
 # literals and cannot drift out of sync with _apply_target_profile(). This works
-# beacuse CIRSimulator._setup_radar_motion() runs last in __init__, after
+# because CIRSimulator._setup_radar_motion() runs last in __init__, after
 # _apply_target_profile() and _sync_target_frame_period().
 # --------------------------------------------------------------------------
 
@@ -1465,7 +1465,7 @@ def _derived_single_tone(profile: str, targets, radar_origin_m, t0_s: float) -> 
     if amplitude_m <= 0.0:
         raise ValueError(
             f"radar_motion_profile = {profile!r} needs a positive "
-            f"micro_motion_amplitude_m on target {getattr(targets, 'name', '?')!r}, got "
+            f"micro_motion_amplitude_m on target {getattr(target, 'name', '?')!r}, got "
             f"{amplitude_m!r}."
         )
 
@@ -1490,7 +1490,7 @@ def _derived_single_tone(profile: str, targets, radar_origin_m, t0_s: float) -> 
         translation_amplitude_m=sign * amplitude_m,
         translation_direction=direction,
         provenance=(
-            f"{profile}: drived from target {getattr(target, 'name', '?')!r}"
+            f"{profile}: derived from target {getattr(target, 'name', '?')!r}"
             f"(amplitude {amplitude_m!r} m, frequency {frequency_hz!r} Hz, phase "
             f"{phase_rad!r} rad, axis {axis_label!r}), sign {sign:+.0f}"
         ),
@@ -1502,7 +1502,7 @@ def build_radar_motion_from_profile(
     targets,
     radar_origin_m,
     slow_time_s,
-    random_seed,
+    random_seed: int,
 ) -> RadarMotion:
     """Resolve a named radar_motion_profile into a RadarMotion.
 
@@ -1511,7 +1511,7 @@ def build_radar_motion_from_profile(
         targets: the resolved cfg.targets list (needed by the derived presets).
         radar_origin_m: array-like [3], the radar base position.
         slow_time_s: array-like [F], the simulation slow-time grid.
-        random_seed (init): scenario seed; only the handheld_* presets use it.
+        random_seed (int): scenario seed; only the handheld_* presets use it.
 
     Returns:
         RadarMotion

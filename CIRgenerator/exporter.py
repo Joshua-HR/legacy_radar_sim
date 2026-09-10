@@ -25,7 +25,7 @@ class CIRLogExporter:
             safe_scenario = self.cfg.scenario_name.replace(" ", "_")
             case_name = f"{self.cfg.radar.test_name}_{safe_scenario}_{now}"
         else:
-            case_name = f"{self.cfg.scenario_name}_case_level{self.cfg.level}_{now}"
+            case_name = f"{self.cfg.radar.test_name}_case_level{self.cfg.level}_{now}"
         case_dir = os.path.join(self.cfg.output_root, case_name)
         os.makedirs(case_dir, exist_ok=True)
         return case_dir
@@ -108,12 +108,12 @@ class CIRLogExporter:
         words = [self._complex_to_hex_word(cir_vector[i]) for i in range(min(taps, len(cir_vector)))]
         return " ".join(words)
 
-    def save_case(self, cir_data: np.ndarray, truth: list[list[dict]]):
+    def save_case(self, cir_data: np.ndarray, truth: List[List[dict]]):
         """Function for saving the results.
 
         Args:
             cir_data (np.ndarray): CIR data
-            truth (List(List[dict])): ground truth list.
+            truth (List[List[dict]]): ground truth list.
 
         Returns:
             (dict): Dictionary with all the save path for logging purpouses.
@@ -140,14 +140,14 @@ class CIRLogExporter:
             "enable_gain_mismatch": self.cfg.optional.enable_gain_mismatch,
             "antenna_gain_mismatch": self.cfg.optional.antenna_gain_mismatch,
             "enable_phase_mismatch": self.cfg.optional.enable_phase_mismatch,
-            "antenna_phase_mismatch": self.cfg.optional.antenna_phase_mismatch_rad,
+            "antenna_phase_mismatch_rad": self.cfg.optional.antenna_phase_mismatch_rad,
             "leakage": asdict(self.cfg.leakage),
             "frontend": asdict(self.cfg.frontend),
 
             "targets": [
                 {
                     "name": t.name,
-                    "position_xy_m": t.position_xy_m,
+                    "position_xy_m": list(t.position_xy_m),
                     "position_z_m": t.position_z_m,
                     "amplitude": t.amplitude,
                     "velocity_xy_m_per_frame": list(t.velocity_xy_m_per_frame),
@@ -213,7 +213,7 @@ class CIRLogExporter:
                         item["position_y_m"],
                         item.get("position_z_m", 0.0),
                         item["angle_deg"],
-                        item.get("theta_deg", 0.0),
+                        item.get("theta_deg", 90.0),
                         item.get("phi_deg", item["angle_deg"]),
                         item.get("elevation_deg", 0.0),
                         item.get("azimuth_deg", item["angle_deg"]),
@@ -254,7 +254,7 @@ class CIRLogExporter:
                     cir_hex = self._cir_line_hex(cir_data[seq, ant_idx], taps)
 
                     f.write(
-                        f"status: OF, "
+                        f"status: OK, "
                         f"sequence: {seq + 1}, "
                         f"ant_bitmap: {ant_bitmap}, "
                         f"rx_gain_dB: {rx_gain}, "
@@ -277,22 +277,22 @@ class CIRLogExporter:
 
 def plot_cir_lin(
     cir_data: np.ndarray, frame_idx: int = 0, title: str = "",
-    save_path: str | None = None, show: bool = True,
+    save_path: Optional[str] = None, show: bool = True,
 ):
     """Plotter for linear CIR
 
     Args:
         cir_data (np.ndarray): CIR data.
-        frame_idx (int, optional): frame index. Defaults to 0
+        frame_idx (int, optional): frame index. Defaults to 0.
         title (str, optional): plot title. Defaults to "".
-        save_path (Opational[str], optional): where the plot will be saved. Defaults to None.
+        save_path (Optional[str], optional): where the plot will be saved. Defaults to None.
         show (bool, optional): if show the plot or not. Defaults to True.
     """
     plt.figure(figsize=(10, 5))
     x = np.linspace(0, cir_data.shape[-1], cir_data.shape[-1])
 
     for ant_idx in range(cir_data.shape[1]):
-        y = np.abs(cir_data[frame_idx, ant_idx])
+        y = cir_data[frame_idx, ant_idx]
         plt.plot(x, y, label=f"Antenna {ant_idx}")
 
     plt.xlim(0, cir_data.shape[-1])
@@ -314,8 +314,8 @@ def plot_cir_magnitude(
     cir_data: np.ndarray,
     frame_idx: int = 0,
     title: str = "",
-    save_path: str | None = None,
-    show: bool = True
+    save_path: Optional[str] = None,
+    show: bool = True,
 ):
     """Plotting function for CIR in dB
 
@@ -323,8 +323,8 @@ def plot_cir_magnitude(
         cir_data (np.ndarray): CIR data.
         frame_idx (int, optional): frame index. Defaults to 0.
         title (str, optional): plot title. Defaults to "".
-        save_path (Optional[str], optional): where the plot will be saved. Defautls to None.
-        show (bool, optional): if show the plot or not. Defaults to True
+        save_path (Optional[str], optional): where the plot will be saved. Defaults to None.
+        show (bool, optional): if show the plot or not. Defaults to True.
     """
     plt.figure(figsize=(10, 5))
     for ant_idx in range(cir_data.shape[1]):
@@ -335,7 +335,7 @@ def plot_cir_magnitude(
     plt.xticks(np.arange(0, cir_data.shape[-1], 2))
     plt.xlabel("CIR Bin")
     plt.ylabel("Magnitude (dB)")
-    plt.title(title if title else f"CIR Magnitude - Frane {frame_idx}")
+    plt.title(title if title else f"CIR Magnitude - Frame {frame_idx}")
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -352,7 +352,7 @@ def plot_cir_taps_magnitude(
     taps: int,
     frame_idx: int = 0,
     title: str = "",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plot magnitude vs CIR taps (NOT full bins).
@@ -419,7 +419,7 @@ def _antenna_gain_dbi_for_polar_plot(cfg, phi_deg: float) -> float:
         theta_gain_dbi = antenna._interp_1d_dbi(rel_theta, antenna.pattern_theta_deg, antenna.pattern_theta_gains_dbi)
         return phi_gain_dbi + theta_gain_dbi
 
-    # Legacy azimuth-only table (and consine fallback): as before.
+    # Legacy azimuth-only table (and cosine fallback): as before.
     rel_angle = wrap_angle_deg(phi_deg - antenna.boresight_deg)
     return antenna._interpolate_pattern_gain_dbi(rel_angle)
 
@@ -427,13 +427,13 @@ def _antenna_gain_dbi_for_polar_plot(cfg, phi_deg: float) -> float:
 def plot_antenna_pattern_polar(
     cfg,
     title: str = "Antenna Radiation Pattern (Polar, normalized dB)",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for antenna polar radiation pattern.
 
     Always plots an azimuth (phi) cut at theta=90 (horizon), i.e. G(phi, 90).
-    For pattern mode == "isotropic" this is a flat 0 dB circle; for legacy
+    For pattern_mode == "isotropic" this is a flat 0 dB circle; for legacy
     "table"/"table_azimuth" it reproduces the previous azimuth-only plot;
     for "table_3d"/"table_3d_separable" it evaluates the full G(phi, theta)
     pattern at theta=90 (the horizontal plane, matching the legacy
@@ -441,7 +441,7 @@ def plot_antenna_pattern_polar(
 
     Args:
         cfg (SimulationConfig): simulation configuration file containing antenna information.
-        title (str, optional): plot title. Defaults to "Antenna Radiration Pattern (Polar, normalized dB)".
+        title (str, optional): plot title. Defaults to "Antenna Radiation Pattern (Polar, normalized dB)".
         save_path (Optional[str], optional): where to save the plot. Defaults to None.
         show (bool, optional): it to show the plot or not. Defaults to True.
     """
@@ -452,7 +452,7 @@ def plot_antenna_pattern_polar(
         for phi_deg in angles_deg
     ])
 
-    # Normalized to peak = 0 dB for visual comparison with datasheet-style plots
+    # Normalizeƒ to peak = 0 dB for visual comparison with datasheet-style plots
     gains_db_norm = gains_dbi - np.max(gains_dbi)
 
     # Clamp for cleaner polar display
@@ -500,7 +500,7 @@ def plot_antenna_pattern_phi_theta_heatmap(
     Args:
         cfg (SimulationConfig): configuration object containing antenna information.
         title (str, optional): plot title.
-        save_path (Option[str], optional): where to save the plot.
+        save_path (Optional[str], optional): where to save the plot.
         show (bool, optional): whether to display the plot.
     """
     phi_deg = np.linspace(-180, 180, 73)
@@ -519,7 +519,7 @@ def plot_antenna_pattern_phi_theta_heatmap(
                 rel_phi = wrap_angle_deg(float(ph) - antenna.boresight_phi_deg)
                 rel_theta = float(th) - antenna.boresight_theta_deg
                 phi_gain = antenna._interp_1d_dbi(rel_phi, antenna.pattern_phi_deg, antenna.pattern_phi_gains_dbi)
-                theta_gain = antenna._interp_1d_dbi(rel_theta, antenna.pattern_theta_deg, antenna.pattern_theta_dbi)
+                theta_gain = antenna._interp_1d_dbi(rel_theta, antenna.pattern_theta_deg, antenna.pattern_theta_gains_dbi)
                 gain_dbi[ti, pi] = phi_gain + theta_gain
             else:
                 gain_dbi[ti, pi] = _antenna_gain_dbi_for_polar_plot(cfg, float(ph))
@@ -533,7 +533,7 @@ def plot_antenna_pattern_phi_theta_heatmap(
     fig.tight_layout()
 
     if save_path:
-        fig.save(save_path, dpi=300, bbox_inches="tight")
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
     if show:
         plt.show()
     else:
@@ -546,7 +546,7 @@ def plot_dual_antenna_coverage_cartesian(
     radius_m: float = 3.0,
     num_angles: int = 721,
     title: str = "Dual Antenna Coverage (Cartesian)",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for show the dual antenna coverage in Cartesian coordinates.
@@ -556,7 +556,7 @@ def plot_dual_antenna_coverage_cartesian(
         radius_m (float, optional): radius in meters. Defaults to 3.0.
         num_angles (int, optional): number of angles. Defaults to 721.
         title (str, optional): plot title. Defaults to "Dual Antenna Coverage (Cartesian)".
-        save_path (Optional[str], optional): where to save the plot. Defautls to None.
+        save_path (Optional[str], optional): where to save the plot. Defaults to None.
         show (bool, optional): it show the plot or not. Defaults to True.
     """
 
@@ -589,7 +589,7 @@ def plot_dual_antenna_coverage_cartesian(
             xs.append(x)
             ys.append(y)
 
-        plt.plot(xs, ys, color=colors[ant_idx % len(colors)], linewidth=2, label=f"Rx{ant_idx+1} pattern")
+        plt.plot(xs, ys, color=colors[ant_idx % len(colors)], linewidth=2, label=f"RX{ant_idx+1} pattern")
         plt.scatter(ap[0], ap[1], color=colors[ant_idx % len(colors)], marker="^", s=120)
 
     rx = cfg.scene.radar_position_x_m
@@ -622,9 +622,9 @@ def plot_cir_taps_overlay_db(
     cir_data: np.ndarray,
     taps: int,
     antenna_idx: int,
-    max_frames: int | None = None,
+    max_frames: Optional[int] = None,
     title: str = "",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for overlay many frames for one antenna in dB, similar to the real-data CIR plot.
@@ -669,7 +669,7 @@ def plot_phase_difference_vs_angle(
     angle_max_deg: float = 90,
     num_points: int = 1000,
     title: str = "Phase Difference vs AoA",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plot theoretical phase difference between RX1 and RX2 versus Angle of Arrival (AoA). This is the key AoA relation for 2-antenna interferometric radar.
@@ -677,8 +677,8 @@ def plot_phase_difference_vs_angle(
     Args:
         cfg (SimulationConfig): configuration object containing the phase values
         angle_min_deg (float, optional): lower limit for angle in degrees. Defaults to -90.
-        angle_max_deg (float, optional): upper limit for angle in degrees. Defaults to 90.
-        num_points (int, optional): numberof point to display. Defaults to 1000.
+        angle_max_deg (float, optional): upper limit for angles in degrees. Defaults to 90.
+        num_points (int, optional): number of point to display. Defaults to 1000.
         title (str, optional): plot title. Defaults to "Phase Difference vs AoA".
         save_path (Optional[str], optional): where to save the plot. Defaults to None.
         show (bool, optional): if show the plot or not. Defaults to True.
@@ -696,7 +696,7 @@ def plot_phase_difference_vs_angle(
     # Core phase difference equation
     phase_diff_rad = (2 * np.pi * d / wavelength) * np.sin(angles_rad)
 
-    # Optional wrapped phased (-pi to pi)
+    # Optional wrapped phase (-pi to pi)
     wrapped_phase = np.angle(np.exp(1j * phase_diff_rad))
 
     plt.figure(figsize=(10, 6))
@@ -739,7 +739,7 @@ def plot_cir_heatmap(
     cir_data: np.ndarray,
     antenna_idx: int = 0,
     title: str = "",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for CIR heatmap
@@ -754,7 +754,7 @@ def plot_cir_heatmap(
     data = np.abs(cir_data[:, antenna_idx, :])
     fig, ax = plt.subplots(figsize=(10,6))
     mesh = ax.pcolormesh(data, cmap='viridis', edgecolors='none')
-    ax.set_xlabel('CIR Bin')
+    ax.set_xlabel("CIR Bin")
     ax.set_ylabel("Frame")
     ax.set_title(title if title else f"CIR Heatmap - Antenna {antenna_idx}")
     fig.colorbar(mesh, ax = ax, label="Magnitude")
@@ -772,7 +772,7 @@ def plot_tap_over_time(
     antenna_idx: int,
     tap_idx: int,
     title: str = "",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for taps over time.
@@ -807,7 +807,7 @@ def plot_tap_over_time(
 def plot_target_trajectories(
     truth: list[list[dict]],
     title: str = "Target Trajectories",
-    save_path: str | None = None,
+    save_path: Optional[str] = None,
     show: bool = True,
 ):
     """Plotting function for targets trajectories
@@ -862,7 +862,7 @@ def plot_target_width_snapshot(
         frame_idx (int, optional): frame index. Defaults to 0.
         title (str, optional): plot title. Defaults to "".
         save_path (Optional[str], optional): where to save the plot. Defaults to None.
-        show (bool, optional): if show the plot or not. Defaults to True.`
+        show (bool, optional): if show the plot or not. Defaults to True.
     """
 
     plt.figure(figsize=(8, 8))
@@ -891,7 +891,7 @@ def plot_target_width_snapshot(
         plt.text(center[0] + 0.03, center[1] + 0.03, target.name, fontsize=10)
 
     plt.xlabel("X Position (m)   [Forward / Range]")
-    plt.ylabel("Y Position (m).  [Left / Right]")
+    plt.ylabel("Y Position (m)   [Left / Right]")
     plt.title(title if title else f"Azimuth Geometry - Frame {frame_idx + 1}")
     plt.grid(True)
     plt.axis("equal")
@@ -911,7 +911,7 @@ def plot_target_width_snapshot(
 def amplitude_to_db(x: np.ndarray, floor_db: float = -60.0) -> np.ndarray:
     """Converts complex amplitude to dB with controlled display floor.
 
-    Since CIR is complex amplictude (not power),
+    Since CIR is complex amplitude (not power),
     we use 20*log10(), not 10*log10().
 
     Args:
@@ -946,7 +946,7 @@ def print_strongest_taps(cir_data, frame_idx=0, taps_to_check=64):
     print("==========================\n")
 
 
-def print_truth_summary(truth: list[list[dict]], max_frames: int = 5):
+def print_truth_summary(truth: List[List[dict]], max_frames: int = 5):
     """Prints in stout the ground truth summary. For debugging purposes.
 
     Args:
@@ -968,7 +968,7 @@ def print_truth_summary(truth: list[list[dict]], max_frames: int = 5):
         print("======================================================\n")
 
 
-def save_all_figures(case_dir: str, cfg, antennas_position, cir_data: np.ndarray, truth: list[list[dict]], selected_level:str):
+def save_all_figures(case_dir: str, cfg, antennas_position, cir_data: np.ndarray, truth: List[List[dict]], selected_level:str):
     """Helper function for save all plots.
 
     Args:
@@ -1095,9 +1095,9 @@ def plot_total(
     cir_data: np.ndarray,
     cfg,
     antennas_position: np.ndarray,
-    truth: list[list[dict]],
+    truth: List[List[dict]],
     selected_level: int = 2,
-    save_dir: str | None = None,
+    save_dir: Optional[str] = None,
     show_plots: bool = False,
 ):
     """
@@ -1107,10 +1107,10 @@ def plot_total(
         cir_data (np.ndarray): CIR data array with shape [num_frames, num_antennas, num_bins].
         cfg (SimulationConfig): Simulation configuration object.
         antennas_position (np.ndarray): Antenna positions array.
-        truth (LIST[LIST[dict]]): Ground truth data.
+        truth (List[List[dict]]): Ground truth data.
         selected_level (int, optional): Simulation level for labeling. Defaults to 2.
         save_dir (Optional[str], optional): Directory to save figures. Defaults to None.
-        show_plots (bool, optional): whethere to display plots (True) or just save (False). Defaults to False.
+        show_plots (bool, optional): Whethere to display plots (True) or just save (False). Defaults to False.
     """
     print("Generating all plots...")
 
@@ -1122,7 +1122,7 @@ def plot_total(
     plot_cir_lin(
         cir_data,
         frame_idx=0,
-        title=f"Level {cfg.level} - CIR Magnitude (Frame 1)",
+        title=f"Level {selected_level} - CIR Magnitude (Frame 1)",
         save_path=os.path.join(save_dir, "cir_lin.png") if save_dir else None,
         show=show_plots,
     )
@@ -1131,7 +1131,7 @@ def plot_total(
     plot_cir_magnitude(
         cir_data,
         frame_idx=0,
-        title=f"Level {cfg.level} - CIR Magnitude (Frame 1)",
+        title=f"Level {selected_level} - CIR Magnitude (Frame 1)",
         save_path=os.path.join(save_dir, "cir_magnitude.png") if save_dir else None,
         show=show_plots,
     )
@@ -1223,7 +1223,7 @@ def plot_total(
         show=show_plots,
     )
 
-    # 12. Tap Over time
+    # 12. Tap Over Time
     plot_tap_over_time(
         cir_data,
         antenna_idx=1,

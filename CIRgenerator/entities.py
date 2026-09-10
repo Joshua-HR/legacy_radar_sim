@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Tuple
-from dataconfig import SceneConfig, as_xyz, vector_to_phi_theta_to_deg, point_to_phi_theta_deg, distance_3d
+from dataconfig import SceneConfig, as_xyz, vector_to_phi_theta_deg, point_to_phi_theta_deg, distance_3d
 from numpy import array, ndarray, linspace, deg2rad, cos, sin, pi, linalg
 @dataclass
 class ReflectionPath:
@@ -19,8 +19,8 @@ class StaticClutterPath:
     """
 
     name: str
-    position_xy_m: tuple[float, float]
-    velocity_xy_m_per_frame: tuple[float, float] = (0.0, 0.0)
+    position_xy_m: Tuple[float, float]
+    velocity_xy_m_per_frame: Tuple[float, float] = (0.0, 0.0)
     position_z_m: float = 0.0
     velocity_z_m_per_frame: float = 0.0
     amplitude: float = 1.0
@@ -35,20 +35,20 @@ class StaticClutterPath:
     # sqrt(rcs_m2). This is the only physically-dimensioned scattering
     # quantity on this class: `amplitude` and `material_factor` above remain
     # unitless empirical multipliers applied on top of it (they are set only
-    # by the hardcoded scenario profiles and ar NOT cross-sections).
+    # by the hardcoded scenario profiles and are NOT cross-sections).
     # The 1.0 default makes sigma = 1 m^2 the explicit engine-wide convention
     # and reproduces the pre-radar-equation amplitude exactly.
     rcs_m2: float = 1.0
-    reflections: list[ReflectionPath] = field(default_factory=list)
+    reflections: List[ReflectionPath] = field(default_factory=list)
 
     # --- 3D vertical extent -----------------------------------------------
     # Vertical (z) extent of the scatterer. When height_m <= 0 (default) the
-    # scatter model collapse to the legacy horizontal-line behavior, so
-    # existing callers stay bit-identical. When hight_m > 0 AND
-    # num_scatter_points_z > 1, scatter points form a rectalgular
+    # scatter model collapses to the legacy horizontal-line behavior, so
+    # existing callers stay bit-identical. When height_m > 0 AND
+    # num_scatter_points_z > 1, scatter points form a rectangular
     # (width x height) grid in the local frame: horizontal offsets along
     # orientation_deg, vertical offsets from bottom_z_m to
-    # bottom_z_m to height_m. Vertical offsets are computed relative to
+    # bottom_z_m + height_m. Vertical offsets are computed relative to
     # the (micro-motion-adjusted for Target) center z, so a wall with
     # bottom_z_m=0 and height_m=room_height_z_m spans floor-to-ceiling
     # regardless of where its center sits.
@@ -60,7 +60,7 @@ class StaticClutterPath:
     # 2nd horizontal extent, perpendicular to orientation_deg. When depth_m <= 0
     # (default) the scatter model collapses to the 1D line along orientation_deg,
     # so existing callers stay bit-identical. When depth_m > 0 AND
-    # num_scatter_points_depts > 1, scatter points form a 2D rectangular grid in
+    # num_scatter_points_depth > 1, scatter points form a 2D rectangular grid in
     # the xy-plane (width x depth), enabling floor/ceiling surfaces.
     depth_m: float = 0.0
     num_scatter_points_depth: int = 1
@@ -89,26 +89,26 @@ class StaticClutterPath:
         Three modes, selected by height_m / depth_m flags:
         - height_m <= 0 AND depth_m <= 0 (default): legacy horizontal line,
           identical to pre-3D-extent behavior.
-        - hight_m > 0 AND num_scatter_points_z > 1: vertical wall surface grid
+        - height_m > 0 AND num_scatter_points_z > 1: vertical wall surface grid
           (num_scatter_points x num_scatter_points_z). Vertical offsets are relative
           to center[2] so the grid spans [bottom_z_m, bottom_z_m + height_m] regardless of
           where the center sits.
         - depth_m > 0 AND num_scatter_points_depth > 1: horizontal surface grid
           (num_scatter_points x num_scatter_points_depth) in the xy-plane, for
-          floor/ceiling. depth_dir is perdendicular to width_dir in xy-plane.
+          floor/ceiling. depth_dir is perpendicular to width_dir in xy-plane.
 
         Args:
             center (np.ndarray): xyz reference point, shape [3].
 
         Returns:
-            (List(np.ndarray]): list of scatter points, each shape [3].
+            (List[np.ndarray]): list of scatter points, each shape [3].
         """
         # Horizontal direction in the local frame (xy-plane yaw only;
         # orientation_deg does not tilt out of the horizontal plane).
         theta = deg2rad(self.orientation_deg)
         width_dir = array([cos(theta), sin(theta), 0.0], dtype=float)
         # Perpendicular horizontal direction for depth_m (floor/ceiling surfaces).
-        dept_dir = array([-sin(theta), cos(theta), 0.0], dtype=float)
+        depth_dir = array([-sin(theta), cos(theta), 0.0], dtype=float)
 
         # Horizontal offsets along orientation_deg: single point if width_m <= 0 or N <= 1.
         if self.width_m > 0.0 and self.num_scatter_points > 1:
@@ -137,7 +137,7 @@ class StaticClutterPath:
             v_offsets = [0.0]
 
         return [
-            center + h * width_dir + d * dept_dir + array([0.0, 0.0, v], dtype=float)
+            center + h * width_dir + d * depth_dir + array([0.0, 0.0, v], dtype=float)
             for h in h_offsets
             for d in d_offsets
             for v in v_offsets

@@ -1416,7 +1416,7 @@ class RadarDopplerProcessor:
         same_dir = int(np.sum(np.sign(significant) == slope_sign))
         direction_ratio = float(same_dir / max(1, significant.size))
         info["track_direction_consistency"] = direction_ratio
-        if direction_ratio < float(getattr(cfg, "track_min_direction_consistencty", 0,75)):
+        if direction_ratio < float(getattr(cfg, "track_min_direction_consistency", 0.75)):
             return False, info
 
         latest_seg = float(self.segment_id)

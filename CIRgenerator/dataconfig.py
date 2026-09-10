@@ -30,7 +30,7 @@ wrap_angle_deg = lambda angle_deg: ((angle_deg + 180.0) % 360.0) - 180.0
 
 def load_pattern_gains_dbi_2d_csv(
     csv_path,
-) -> "Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[flot, ...], ...]]":
+) -> "Tuple[Tuple[float, ...], Tuple[float, ...], Tuple[Tuple[float, ...], ...]]":
     """Load a single-antenna measured G(phi, theta) pattern from CSV.
 
     Args:
@@ -122,28 +122,28 @@ def load_pattern_gains_dbi_2d_per_ant_csv(
     Returns:
         (pattern_phi_deg, pattern_theta_deg, pattern_gains_dbi_2d_per_ant):
             shared phi/theta axes, and a tuple of per-antenna gain tables
-            (each shape [len(pattern_phideg), len(pattern_theta_get)]).
+            (each shape [len(pattern_phi_deg), len(pattern_theta_get)]).
 
     Raises:
         ValueError: csv_paths is empty, or the CSVs' phi/theta axes
             don't all match exactly.
     """
     if not csv_paths:
-        raise ValueError("csv paths must contain at least one path.")
+        raise ValueError("csv_paths must contain at least one path.")
 
-    phi_axes0, theta_axes0, gains0 = load_pattern_gains_dbi_2d_csv(csv_paths[0])
+    phi_axis0, theta_axis0, gains0 = load_pattern_gains_dbi_2d_csv(csv_paths[0])
     gains_per_ant = [gains0]
 
     for csv_path in csv_paths[1:]:
         phi_axis, theta_axis, gains = load_pattern_gains_dbi_2d_csv(csv_path)
-        if phi_axis != phi_axes0 or theta_axis != theta_axes0:
+        if phi_axis != phi_axis0 or theta_axis != theta_axis0:
             raise ValueError(
                 f"{csv_path}: phi/theta axes do not match {csv_paths[0]} - "
                 "all per-antenna pattern CSVs must share the same grid."
             )
         gains_per_ant.append(gains)
     
-    return phi_axes0, theta_axes0, tuple(gains_per_ant)
+    return phi_axis0, theta_axis0, tuple(gains_per_ant)
 
 
 # --------------------------------------------------------------------------
@@ -172,11 +172,11 @@ def load_pattern_gains_dbi_2d_per_ant_csv(
 # point_to_phi_theta_deg() upgrade them to 3D with z=0.0 automatically.
 # --------------------------------------------------------------------------
 
-def as_xyz(position_xy_m, z_m: float = 0.0) -> np.ndarray:
+def as_xyz(position_xy_m, z_m: float = 0.0) -> "np.ndarray":
     """Convert a legacy 2D (x, y) position (or an already-3D position) into xyz.
 
     Args:
-        position_xy_m: array-like of lengh 2 (x, y) or length 3 (x, y, z)
+        position_xy_m: array-like of length 2 (x, y) or length 3 (x, y, z)
         z_m: z value used only when position_xy_m is 2D.
 
     Returns:
@@ -193,13 +193,13 @@ def as_xyz(position_xy_m, z_m: float = 0.0) -> np.ndarray:
     raise ValueError(f"Position must have length 2 or 3, got shape {arr.shape}")
 
 
-def vector_to_phi_theta_to_deg(vec) -> "tuple[float, float]":
-    """Convert a displacement vector in to (phi_deg, theta_deg).
+def vector_to_phi_theta_deg(vec) -> "tuple[float, float]":
+    """Convert a displacement vector into (phi_deg, theta_deg).
 
-    Args.
+    Args:
         vec: array-like [dx, dy] or [dx, dy, dz].
 
-    Returns.
+    Returns:
         (phi_deg, theta_deg): azimuth and polar angle (from +z) in degrees.
         If vec is the zero vector, atan2(0, 0) == 0, so this returns
         (phi_deg = 0.0, theta_deg = 0.0) - the degenerate "+z axis" directions.
@@ -221,23 +221,23 @@ def point_to_phi_theta_deg(origin_pos, point_pos) -> "tuple[float, float]":
     """Compute (phi_deg, theta_deg) of point_pos as seen from origin_pos."""
     origin_xyz = as_xyz(origin_pos)
     point_xyz = as_xyz(point_pos)
-    return vector_to_phi_theta_to_deg(point_xyz - origin_xyz)
+    return vector_to_phi_theta_deg(point_xyz - origin_xyz)
 
 
-def vector_to_theta_phi_to_deg(vec) -> "tuple[float, float]":
+def vector_to_theta_phi_deg(vec) -> "tuple[float, float]":
     """Deprecated: prefer vector_to_phi_theta_deg() (phi, theta) order.
 
-    Kept only for backward compatiability with older call sites; returns
+    Kept only for backward compatibility with older call sites; returns
     (theta_deg, phi_deg) - the reversed order.
     """
-    phi_deg, theta_deg = vector_to_phi_theta_to_deg(vec)
+    phi_deg, theta_deg = vector_to_phi_theta_deg(vec)
     return theta_deg, phi_deg
 
 
 def point_to_theta_phi_deg(origin_pos, point_pos) -> "tuple[float, float]":
     """Deprecated: prefer point_to_phi_theta_deg() (phi, theta) order.
 
-    Kept only for backward compatiability with older call sites; returns
+    Kept only for backward compatibility with older call sites; returns
     (theta_deg, phi_deg) - the reversed order.
     """
     phi_deg, theta_deg = point_to_phi_theta_deg(origin_pos, point_pos)
@@ -256,23 +256,23 @@ def _debug_check_geometry_convention() -> None:
     theta_deg   = polar angle       = atan2(sqrt(dx^2 + dy^2), dz)  (from +z axis)
     """
     # [1, 0, 0] lies in the x-y plane (dz=0) -> theta = 90 deg (horizon).
-    phi0, theta0 = vector_to_phi_theta_to_deg([1.0, 0.0, 0.0])
+    phi0, theta0 = vector_to_phi_theta_deg([1.0, 0.0, 0.0])
     assert abs(theta0 - 90.0) < 1e-9 and abs(phi0) < 1e-9, (phi0, theta0)
 
-    phi45, _ = vector_to_phi_theta_to_deg([1.0, 1.0, 0.0])
+    phi45, _ = vector_to_phi_theta_deg([1.0, 1.0, 0.0])
     assert abs(phi45 - 45.0) < 1e-9, phi45
 
     # [1, 0, 1]: horizontal_range == dz == 1 -> theta = 45 deg either way
     # (this vector happens to be the fixed point of theta_hfss = 90 - theta_elev).
-    _, theta45 = vector_to_phi_theta_to_deg([1.0, 0.0, 1.0])
+    _, theta45 = vector_to_phi_theta_deg([1.0, 0.0, 1.0])
     assert abs(theta45 - 45.0) < 1e-9, theta45
 
     # [0, 0, 1] lies on +z axis -> theta = 0 deg exactly.
-    _, theta_up = vector_to_phi_theta_to_deg([0.0, 0.0, 1.0])
+    _, theta_up = vector_to_phi_theta_deg([0.0, 0.0, 1.0])
     assert abs(theta_up) < 1e-9, theta_up
 
 
-# Run once at import time - cheap, catches convention regressions immeidately.
+# Run once at import time - cheap, catches convention regressions immediately.
 _debug_check_geometry_convention()
 
 
@@ -306,12 +306,12 @@ def default_isotropic_pattern_gains_dbi_2d() -> Tuple[Tuple[float, ...], ...]:
 
 def default_pattern_phi_gains_dbi_zero() -> Tuple[float, ...]:
     """All-zero-dBi azimuth cut, aligned with default_pattern_phi_deg_15()."""
-    return tuple (0.0 for _ in default_pattern_phi_deg_15())
+    return tuple(0.0 for _ in default_pattern_phi_deg_15())
 
 
-def default_pattern_theta_gains_dbi_zeo() -> Tuple[float, ...]:
+def default_pattern_theta_gains_dbi_zero() -> Tuple[float, ...]:
     """All-zero-dbi polar-angle cut, aligned with default_pattern_theta_deg_15()."""
-    return tuple (0.0 for _ in default_pattern_theta_deg_15())
+    return tuple(0.0 for _ in default_pattern_theta_deg_15())
 
 
 @dataclass
@@ -331,7 +331,7 @@ class AntennaConfig:
     # distance, with a per-collider-type excess-loss exponent on top of the
     # physical n=2 term (see CIRSimulator._radar_equation_amplitude_factor).
     # n == 2.0 reduces exactly to the radar equation; n > 2.0 adds excess loss
-    # (indoor multiplath / clutter / re-reflection) beyond
+    # (indoor multipath / clutter / re-reflection) beyond
     # path_loss_ref_distance_m. Uses the SAME carrier_freq_hz/lambda_m as the
     # phase term above - do not add a second frequency knob.
     # These exponents apply ONLY to scattered echoes. TX-RX coupling
@@ -346,7 +346,7 @@ class AntennaConfig:
     # Calibration multiplier = (4*pi)**1.5 * path_loss_ref_distance_m**2 / lambda_m,
     # evaluated ONCE at the DEFAULT carrier_freq_hz/path_loss_ref_distance_m above. This
     # keeps the legacy numeric convention (amplitude=1.0 at d=1m for sigma=1 m^2) so
-    # noise_std, ADC clipping, quantiazation, the Q8.8 hex codec scale, and leakage
+    # noise_std, ADC clipping, quantization, the Q8.8 hex codec scale, and leakage
     # constants elsewhere in this codebase - all tuned against that O(1) convention -
     # stay self-consistent across the radar-equation migration.
     #
@@ -356,7 +356,7 @@ class AntennaConfig:
     # lambda_m (as the previous (4*pi*d0/lambda_m)**2 comment instructed) would cancel
     # that dependence and silently restore a lambda**0 amplitude law, breaking
     # cross-channel (e.g. Ch5 vs Ch9) voltage scaling.
-    # Only path_loss_ref_distance_m changing warrants recomputing it.abs
+    # Only path_loss_ref_distance_m changing warrants recomputing it
     # See docs/friis_path_loss_model.md for the derivation.
     path_loss_ref_gain: float = 1186.830373866022 # unitless calibration multiplier (see comment above)
     
@@ -380,7 +380,7 @@ class AntennaConfig:
     # be boresight_theta_deg=90.0. This numeric default is unchanged from
     # before the 2026-07-13 theta-convention fix; it has not yet been set
     # to reflect any specific antenna's actual mounting orientation - do
-    # not assume 0.0 is physically correct for a horizon-pointing antanna.
+    # not assume 0.0 is physically correct for a horizon-pointing antenna.
     boresight_theta_deg: float = 0.0
 
     pattern_exponent: float = 2.0
@@ -388,12 +388,12 @@ class AntennaConfig:
     
     # --- Legacy azimuth-only table (angle in deg, gain in dBi) ------------
     # Kept for backward compatibility with pattern_mode == "table".
-    pattern_angles_deg: tuple[float, ...] = (
+    pattern_angles_deg: Tuple[float, ...] = (
         -180, -165, -150, -135, -120, -105, -90, -75, -60, -45, -30, -15,
         0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 160, 165, 180
     )
 
-    pattern_gains_dbi: tuple[float, ...] = (
+    pattern_gains_dbi: Tuple[float, ...] = (
         -3.2, -3.0, -2.8, -2.5, -2.2, -1.8, -1.4, -1.1, -0.8, -0.5, -0.3, -0.1,
         0.0, -0.1, -0.3, -0.5, -0.8, -1.1, -1.4, -1.8, -2.2, -2.5, -2.8, -3.0, -3.2 
     )
@@ -427,7 +427,7 @@ class AntennaConfig:
         default_factory=default_pattern_phi_gains_dbi_zero
     )
     pattern_theta_gains_dbi: Tuple[float, ...] = field(
-        default_factory=default_pattern_theta_gains_dbi_zeo
+        default_factory=default_pattern_theta_gains_dbi_zero
     )
 
     def _interpolate_pattern_gain_dbi(self, rel_angle_deg: float) -> float:
@@ -629,8 +629,8 @@ class AntennaConfig:
 
         gain_dbi = (
             q00 * (1 - phi_w) * (1 - theta_w)
-            + q01 * phi_w * (1 - theta_w)
-            + q10 * (1 - phi_w) * theta_w
+            + q10 * phi_w * (1 - theta_w)
+            + q01 * (1 - phi_w) * theta_w
             + q11 * phi_w * theta_w
         )
 
@@ -647,9 +647,9 @@ class AntennaConfig:
         antenna uses the single shared pattern_gains_dbi_2d table.
         """
         rel_phi = wrap_angle_deg(phi_deg - self.boresight_phi_deg)
-        rel_thetha = theta_deg - self.boresight_theta_deg
+        rel_theta = theta_deg - self.boresight_theta_deg
 
-        gain_dbi = self._interp_2d_gain_dbi(rel_phi, rel_thetha, ant_idx=ant_idx)
+        gain_dbi = self._interp_2d_gain_dbi(rel_phi, rel_theta, ant_idx=ant_idx)
 
         # dBi is power-like gain; CIR samples are complex amplitude, so /20.
         gain_linear = 10.0 ** (gain_dbi / 20.0)
@@ -893,7 +893,7 @@ class FrontendConfig:
 
     frame_timing_jitter_std_bins: float = 0.08
 
-    pulse_spread_kernel: tuple[float, ...] = (
+    pulse_spread_kernel: Tuple[float, ...] = (
         0.10,
         0.22,
         0.36,
@@ -940,7 +940,7 @@ class SceneConfig:
     # theta_deg is expected to differ from the flat-scene default of 90 deg
     # (horizon; see the geometry-convention block at the top of this file).
     #   "2d_legacy" - antenna/target/clutter z forced to 0.0 (old behavior).
-    #   "3d"abs     - antenna z = radar_height_z_m; target/clutter z respected.
+    #   "3d"        - antenna z = radar_height_z_m; target/clutter z respected.
     geometry_mode: str = "2d_legacy"
     
 @dataclass
@@ -954,19 +954,19 @@ class RadarMotionConfig:
     CIRSimulator._antenna_positions_at_frame().
 
     The section itself is optional, but WITHIN the section the surface is
-    strict: an unknwon key, or a key that belongs to a different ``type``, is a
+    strict: an unknown key, or a key that belongs to a different ``type``, is a
     hard error (ego_motion.validate_ini_keys). A typo must never silently
-    disabled the motion.
+    disable the motion.
 
     The radar BASE pose is not configured here -- it is the existing
-    ``[scene] radar_position_x_m / radar_position_y_m / radar_height_z_``
+    ``[scene] radar_position_x_m / radar_position_y_m / radar_height_z_m``
     (position) with an identity base orientation, because this engine has no
-    radar-orientation field. the ``boresight_*`` fields on AntennaConfig are an
+    radar-orientation field. The ``boresight_*`` fields on AntennaConfig are an
     antenna-pattern lookup offset, NOT a radar body rotation, and are
     deliberately left untouched by ego motion. See docs/ego_motion_model.md
 
     Units follow the project convention (name carries the unit): metres,
-    radians, heartz, seconds.
+    radians, hertz, seconds.
     """
 
     # "static" | "sampled_pose" | "handheld_jitter"
@@ -986,7 +986,7 @@ class RadarMotionConfig:
     #
     # The `mirror_target_micromotion` / `cancel_target_micromotion` presets are
     # DERIVED: they read the resolved target's own micro-motion parameters, so
-    # they need no duplicated literals. That is only possible bacause
+    # they need no duplicated literals. That is only possible because
     # CIRSimulator._setup_radar_motion() runs after _apply_target_profile().
     profile: str = ""
 
@@ -1037,8 +1037,8 @@ class OptionalImpairments:
     """Container class for optional impairment
     """
     enable_gain_mismatch: bool = False
-    antenna_gain_mismatch: list[float] | None = None
+    antenna_gain_mismatch: Optional[List[float]] = None
     enable_phase_mismatch: bool = False
-    antenna_phase_mismatch_rad: list[float] | None = None
+    antenna_phase_mismatch_rad: Optional[List[float]] = None
     enable_baseline_subtraction: bool = True
     save_baseline_frame: bool = True

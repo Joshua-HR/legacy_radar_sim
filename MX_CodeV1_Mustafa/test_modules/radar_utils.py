@@ -72,7 +72,7 @@ RX_DUMMY_TIME_STD_TH = 1e-5
 ENABLE_SINGLE_RX_FALLBACK = False
 
 
-USE_DIAGNOSTIC_MOTION_DETECTION = True
+USE_DIAGNOSTIC_MOTION_DETECTOR = True
 DIAG_FORCE_RX_INDEX = 0             # 0 = Rx1/0101. Use RX1 first because RX2 was unstable/frozen in logs.
 DIAG_MOTION_EXCESS_DB_TH = 6.0      # dynamic energy must exceed no-motion floor by this amount
 DIAG_MOTION_MIN_RATIO_DB = -36.0    # less strict for live walking test
@@ -92,13 +92,13 @@ DIAG_RANGE_MIN_CM = 90.0
 DIAG_RANGE_MAX_CM = 420.0
 
 
-# Function to clear all files in a dictionary, optionally including subdirectories
+# Function to clear all files in a directory, optionally including subdirectories
 def clear_folder(folder_path, include_subfolders=False):
     """
     Deletes all files inside the specified folder.
 
     Parameters:
-    - folder_path (str): Path to the foler to be cleared.
+    - folder_path (str): Path to the folder to be cleared.
     - include_subfolders (bool): Whether to delete files in subfolders as well.
     """
     if not os.path.exists(folder_path):
@@ -123,13 +123,13 @@ def plot_detections(detections, time):
         {
             'range': float (cm),
             'power': float,
-            'directions': float (degrees)
+            'direction': float (degrees)
         }
     """
 
 
     ranges = np.array([d['range'] for d in detections])             # cm
-    directions = np.array([d['directions'] for d in detections])    # deg
+    directions = np.array([d['direction'] for d in detections])    # deg
     powers = np.array([d['power'] for d in detections])
 
 
@@ -140,7 +140,7 @@ def plot_detections(detections, time):
 
 
     plt.figure(figsize=(8, 8))
-    sc = plt.scatter(x, y, c=power, s=15**2, cmap='viridis') # s = diameter
+    sc = plt.scatter(x, y, c=powers, s=15**2, cmap='viridis') # s = diameter
 
     
     cbar = plt.colorbar(sc)
@@ -193,13 +193,13 @@ def calculate_beamforming_weights(frequency, dir, d, N=2, differential_beam = Fa
 def CFAR(data_dB, threshold, sigma_grater_delta_indicator = None):
     """
     CFAR function for detecting targets
-    Constant false alarm rate (CFAR) detection is a commmon form of adaptive algorithm used in radar systems
+    Constant false alarm rate (CFAR) detection is a common form of adaptive algorithm used in radar systems
     to detect target returns against a background of noise, clutter and interference.
     description source: https://en.wikipedia.org/wiki/Constant_false_alarm_rate
 
     :param data: FFT response of collected data in dB scale: data_dB = 10*np.log10(np.abs(data_complex))
     :param threshold: threshold in dB for checking if there is a target
-    :param sigma_grater_indicator: difference between sigma and delta beams in dB, if >0 target in scope
+    :param sigma_grater_delta_indicator: difference between sigma and delta beams in dB, if >0 target in scope
     :return: Detection map
     """
 
@@ -473,7 +473,7 @@ class RadarPostprocessing():
     
     def get_doppler_velocity(self):
         """
-            retrun Doppler velocity values
+            return Doppler velocity values
         """
         return self.doppler_velocity
 
@@ -549,20 +549,20 @@ class RadarPostprocessing():
             plt.plot(self.get_radar_range(), doppler_response[df_idx,:])
         plt.grid(True)
 
-    def update_clutter_map(self, beam_idx, doppler_response_msg):
+    def update_clutter_map(self, beam_idx, doppler_response_mag):
         """
         Update clutter map with new data magnitude - moving averaging
         Clutter map is created for all beams
 
         :param beam_idx - index of beam which show for which beam data comes and need to be updated
-        :param doppler_response_msg - magnitude of doppler response for new segment
+        :param doppler_response_mag - magnitude of doppler response for new segment
         """
         self.clutter_map[beam_idx,:,:] *= (self.beta - 1)/self.beta
-        self.clutter_map[beam_idx,:,:] += 1/self.beta * doppler_response_msg.copy()
+        self.clutter_map[beam_idx,:,:] += 1/self.beta * doppler_response_mag.copy()
         if self.beta < BETA and (beam_idx == self.num_beams - 1): # update beta only after processing of last beam
             self.beta += 3 # increase beta every 3 to not be sensitive on first segments
 
-    def target_parameter_estimation(self, doppler_response: np.ndarray, detection_map: np.ndarray, beam_direction_deg: float):
+    def target_parameter_estimation(self, doppler_responses: np.ndarray, detection_map: np.ndarray, beam_direction_deg: float):
         """
         Convert detection map into raw target list.
         Each detected cell becomes a raw target candidate.
@@ -572,15 +572,15 @@ class RadarPostprocessing():
 
         for doppler_idx in range(detection_map.shape[0]):
             for range_idx in range(SKIP_TAPS, detection_map.shape[1]):
-                if detection_map[dopper_idx, range_idx] > 0:
-                    p12 = doppler_response[0, doppler_idx, range_idx] * np.conj(doppler_response[1, doppler_idx, range_idx])
+                if detection_map[doppler_idx, range_idx] > 0:
+                    p12 = doppler_responses[0, doppler_idx, range_idx] * np.conj(doppler_responses[1, doppler_idx, range_idx])
                     phase_term = lamb * np.angle(p12) / (2 * np.pi * ANTENNA_SPACING)
 
                     # protect asin from slight overflow
                     phase_term = np.clip(phase_term, -1.0, 1.0)
 
                     angle_deg = np.rad2deg(np.arcsin(phase_term)) + beam_direction_deg
-                    power_lin = np.sum(np.abs(doppler_response[:, doppler_idx, range_idx]) ** 2)
+                    power_lin = np.sum(np.abs(doppler_responses[:, doppler_idx, range_idx]) ** 2)
                     power_db = 10 * np.log10(np.maximum(power_lin, EPS_MAG))
                     vel_mps = self.doppler_velocity[doppler_idx]
 
@@ -675,7 +675,7 @@ class RadarPostprocessing():
         grouped = []
         for g in groups:
             if g['count'] >= MIN_POINTS_PER_GROUP:
-                grounped.append({
+                grouped.append({
                     'range': float(g['range']),
                     'direction': float(g['direction']),
                     'velocity': float(g['velocity']),
@@ -702,7 +702,7 @@ class RadarPostprocessing():
             return []
 
         if not self.prev_grouped_targets:
-            self.prev_grouped_targets = [dect(t) for t in grouped_targets]
+            self.prev_grouped_targets = [dict(t) for t in grouped_targets]
             return grouped_targets
 
         smoothed = []
@@ -858,7 +858,7 @@ class RadarPostprocessing():
         amp_z = amp_delta_db / np.maximum(self.diag_amp_std_db, DIAG_BASELINE_STD_FLOOR_DB)
 
         ratio_excess_db = ratio_db - self.diag_baseline_db
-        ratio_mask = (ratio_excess_db >= DIAG_MOTION_EXCESS_DB_TH) & (ratio_db >= DIAG_MOTION_MIN_RATIO_DB) * range_mask
+        ratio_mask = (ratio_excess_db >= DIAG_MOTION_EXCESS_DB_TH) & (ratio_db >= DIAG_MOTION_MIN_RATIO_DB) & range_mask
         amp_mask = (amp_delta_db >= DIAG_AMP_DELTA_DB_TH) & (amp_z >= DIAG_AMP_Z_TH) & range_mask
         strong_amp_mask = (amp_delta_db >= DIAG_STRONG_AMP_DELTA_DB_TH) & range_mask
         motion_mask = ratio_mask | amp_mask | strong_amp_mask
@@ -915,7 +915,7 @@ class RadarPostprocessing():
             self._put_latest_targets([])
 
         print(
-            f'[MOTION_DIAG_V9] rx=RX{rx_idx+1}, amp_delta={max_amp_delta_db:.1f}dB, '
+            f'[MOTION_DIAG_V9] rx=RX{rx_idx+1}, amp_delta={max_amp_delta_db:.1f} dB, '
             f'amp_z={max_amp_z:.1f}, ratio={max_ratio_db:.1f} dB, '
             f'ratio_excess={max_ratio_excess_db:.1f} dB, active={active_taps} '
             f'(amp={amp_active_taps}, ratio={ratio_active_taps}), '
@@ -1002,7 +1002,7 @@ class RadarPostprocessing():
         """
 
         active_rx_mask = self.rx_health_check(segment)
-        if USE_DIAGNOSTIC_MOTION_DETECTION:
+        if USE_DIAGNOSTIC_MOTION_DETECTOR:
             self.run_diagnostic_motion_detector(segment, active_rx_mask)
             return
 
@@ -1010,7 +1010,7 @@ class RadarPostprocessing():
             if ENABLE_SINGLE_RX_FALLBACK:
                 self.run_single_rx_motion_postprocessing(segment, active_rx_mask)
             else:
-                print('[RF CHECK] Less than 2 valid RX channels. Dropping fame because AoA is invalid.')
+                print('[RF CHECK] Less than 2 valid RX channels. Dropping frame because AoA is invalid.')
                 self._put_latest_targets([])
             return
 
@@ -1026,8 +1026,8 @@ class RadarPostprocessing():
             doppler_response = np.zeros((doppler_responses.shape[1], doppler_responses.shape[2]), dtype=np.complex64)
             doppler_response_diff = np.zeros_like(doppler_response)
             for ant_idx in range(segment.shape[0]):
-                doppler_response += self.beam_weights[beam_idx, ant_idx]*doppler_response[ant_idx, :, :]
-                doppler_response_diff += self.diff_beam_weights[beam_idx, ant_idx]*doppler_response[ant_idx, :, :]
+                doppler_response += self.beam_weights[beam_idx, ant_idx]*doppler_responses[ant_idx, :, :]
+                doppler_response_diff += self.diff_beam_weights[beam_idx, ant_idx]*doppler_responses[ant_idx, :, :]
 
             sigma_grater_delta_indicator = np.abs(doppler_response) - np.abs(doppler_response_diff) > 0
 
@@ -1084,21 +1084,21 @@ class RadarPostprocessing():
         if len(filtered_targets) < MIN_FILTERED_TARGETS_PER_FRAME:
             self.confirm_counter = 0
             self.prev_grouped_targets = []
-            printf(f'raw targets: {raw_target_count}, filtered: {len(filtered_targets)}, grouped: 0, decision=NO_MOTION')
+            print(f'raw targets: {raw_target_count}, filtered: {len(filtered_targets)}, grouped: 0, decision=NO_MOTION')
             self._put_latest_targets([])
             return
 
         # 2) group nearby detections into person-level targets
         grouped_targets = self.group_targets(filtered_targets)
 
-        # Required confirmation in consecutive completed radar frames before displaying.
+        # Require confirmation in consecutive completed radar frames before displaying.
         if grouped_targets:
             self.confirm_counter += 1
         else:
             self.confirm_counter = 0
 
         if self.confirm_counter < MIN_GROUP_CONFIRM_FRAMES:
-            print(f'raw targets: {raw_target_count}, filtered: {len(filtered_targets)}, grouped: {len(filtered_targets)}, decision=WAIT_CONFIRM')
+            print(f'raw targets: {raw_target_count}, filtered: {len(filtered_targets)}, grouped: {len(grouped_targets)}, decision=WAIT_CONFIRM')
             self._put_latest_targets([])
             return
 

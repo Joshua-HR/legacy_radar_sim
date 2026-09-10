@@ -10,18 +10,18 @@ from test_modules.message_templates import *
             Data formatting and parsing section
 ==================================================================="""
 
-# converts STS CMP200 format (list like ['#H75', '#H3']) to bytearray
-def stsToBytes(sts : list):
+# convert STS CMP200 format (list like ['#H75', '#H3']) to bytearray
+def stsToBytes(sts : list) :
     convBytes = bytearray(len(sts))
     for i in range(len(sts)) :
         b = int(sts[i][2:], 16)
         convBytes[i] = b
     return convBytes
 
-# convert bytearray to STS CMP 200 format
+# convert bytearray to STS CMP200 format
 def bytesToSts(convBytes: bytearray):
     sts = list()
-    for i in range(len(convBytes)):
+    for i in range(len(convBytes)) :
         sts.append("#H{0:X}".format(convBytes[i]))
     return sts
 
@@ -34,15 +34,15 @@ def hdist_to_STS(convSts: str, hdist: str):
     convStsOrig = deepcopy(convSts)
     flipBits(convSts, bitsToFlip, indices)
     stsFlipped = bytesToSts(convSts)
-    print("Success? ", not(BASE_STS == stsFlipped), "bitFlipped: ", bitsToFlip,
+    print("Success? ", not(BASE_STS == stsFlipped), "bitflipped: ", bitsToFlip,
         "HD between base and current is: ", hammingDistance(convSts, convStsOrig))
     return convSts
 
 # generate truncated Fisher-Yates shuffle - last count elements will contain random bits
-def genBits(count : int, indices : int):
+def genBits(count : int, indices : list):
     maxIdx = len(indices) - 1
     for i in range(maxIdx, maxIdx - count, -1):
-        ir = random.rnadrange(i)
+        ir = random.randrange(i)
         # swap i, ir
         # print("swapping ", i, ir)
         x = indices[i]
@@ -54,24 +54,24 @@ def genBits(count : int, indices : int):
 def flipBits(arr : bytearray, count : int, indices : list):
     maxIdx = len(indices) - 1
     for i in range(maxIdx, maxIdx - count, -1):
-        idx = indices[i]
+        idx  = indices[i]
         # alter bit
         # print("altering ", i, idx)
-        bv = arr[idx // 8] ^ 1 // idx % 8
+        bv = arr[idx // 8] ^ 1 << idx % 8
         arr[idx // 8] = bv
     return
 
 # calculate Hamming distance
-def hammingDistance(b1 : bytes, b2 : bytes):
+def hammingDistance(b1 : bytes, b2 : bytes) :
     cnt = 0
-    for i in range(min(len(b1), len(b2))) : 
+    for i in range(min(len(b1), len(b1))) : 
         cnt += (b1[i] ^ b2[i]).bit_count()
     return cnt
 
-def savePkt(name : str, pkt : bytes):
+def savePkt(name : str, pkt : bytes) :
     bits = len(pkt) * 8
-    f = open(name[1:-1], 'wb')#f=open(name + '.dm_iqd', 'wb')
-    f.write(btyes('{TYPE:SMU-DL}{COPYRIGHT:Rohde&Schwarz}{DATE:2024-10-22;13:35:18}', encoding='ascii'))
+    f = open(name[1:-1], 'wb')#f = open(name + '.dm_iqd', 'wb')
+    f.write(bytes('{TYPE:SMU-DL}{COPYRIGHT:Rohde&Schwarz}{DATE:2024-10-22;13:35:18}', encoding='ascii'))
     f.write(bytes('{{DATA BITLENGTH:{0}}}{{DATA LIST-{1}:#'.format(bits, bits // 8 + 1), encoding='ascii'))
     f.write(pkt)
     f.write(bytes('}', encoding='ascii'))
@@ -82,7 +82,7 @@ def hex_to_complex_q8_8(hexnum: str):
     if len(hexnum)!= 8:
         raise Exception('hexnum length different than 8 (4bytes)')
     #hexnum = revert_hex(hexnum)
-    return _hex_to_q8_8(hexnum[:4]) + 1j*_hex_to_q8_8(hexnum[4:8])
+    return _hex_to_q8_8(hexnum[:4]) +1j*_hex_to_q8_8(hexnum[4:8])
 
 def _hex_to_q8_8(hex_str) -> float:
     """Convert hex string to Q8.8 fixed-point format
@@ -91,32 +91,32 @@ def _hex_to_q8_8(hex_str) -> float:
 
     # Handle signed values (16-bit signed integer)
     if integer_value & 0x8000:  # Check if the sign bit is set
-        integer_value -= 0x10000 # Convert to negative value
+        integer_value -= 0x10000  # Convert to negative value
 
     # Convert to Q8.8 fixed-point format
-    q8_8_value = integer_value / (1 << 8)   # Divide by 2^8
+    q8_8_value = integer_value / (1 << 8)  # Divide by 2^8
     return q8_8_value
 
-def _hextofloat(hexnum: set, format: float):
-    hexnum = hexnum.upper()
+def _hextofloat(hexnum: str, format: float):
+    hexnum=hexnum.upper()
     if format == 8.8:
         hex_dic = {"0": 0, "1": 16, "2": 32, "3": 48, "4": 64, "5": 80, "6": 96, "7": 112, "8": -128, "9": -112,
-                    "A": -96, "B": -80, "C": -64, "D": -48, "E": -32, "F": -16}
+                   "A": -96, "B": -80, "C": -64, "D": -48, "E": -32, "F": -16}
         intpart = hex_dic[hexnum[0]] + int(hexnum[1], base=16)
 
         todeci = int(hexnum, base=16)
-        binar = bin(todeci).split('b')[-q].zfill(16)
+        binar = bin(todeci).split('b')[-1].zfill(16)
         fracpart = 0
         for i in range(1, 9):
             fracpart += int(binar[-i]) / (2 ** (9 - i))
-    elif formt == 9.7:
+    elif format == 9.7:
         hex_dic = {"0": 0, "1": 32, "2": 64, "3": 96, "4": 128, "5": 160, "6": 192, "7": 224, "8": -256, "9": -224,
-                    "A": -192, "B": -160, "C": -128, "D": -96, "E": -64, "F": -32}
+                   "A": -192, "B": -160, "C": -128, "D": -96, "E": -64, "F": -32}
         todeci = int(hexnum, base=16)
         binar = bin(todeci).split('b')[-1].zfill(16)
         fracpart = 0
         for i in range(1, 8):
-            fracpart += int(birnar[-i]) / (2 ** (8 - i))
+            fracpart += int(binar[-i]) / (2 ** (8 - i))
 
         intpart = hex_dic[hexnum[0]] + int(hexnum[1], base=16) * 2 + int(binar[-8])
 
@@ -128,9 +128,9 @@ def hex_to_float(hex_num: str, format = 8.8):
 def get_int(s_in: str, pos: int = 0, len: int = 8):
     _s = s_in[pos: pos + len]
     if len == 8:
-        return int(_s[6:8] + _s[4:6] + _s[2:4] + _s[0:2], base=16)
+        return int(_s[6:8] + _s[4:6] + _s[2:4] + _s[0:2], base = 16)
     elif len == 4:
-        return int(_s[2:4] + _s[0:2], base=16)
+        return int(_s[2:4] + _s[0:2], base = 16)
     elif len == 2:
         return int(_s[0:2], base = 16)
     else:
@@ -153,7 +153,7 @@ def revert_hex(s: str) -> str:
 def log_config(test_name: str, config: dict, logger: logging, file_name: str = "config.ini"):
     filler = '*' * 34
     title = f"{file_name} for {test_name} test"
-    msg = "{filler:<<44}{title}{filler:>>44}".format(filler = filler, title = title)
+    msg = "{filler:<44}{title}{filler:>44}".format(filler = filler, title = title)
     logger.debug(msg)
 
     main_settings = get_cfg_section(config, 'TEST')
@@ -178,7 +178,7 @@ def log_config(test_name: str, config: dict, logger: logging, file_name: str = "
     logger.debug("")
 
     title = "end of " + title
-    msg = "{filler:<<44}{title}{filler:>>44}".format(filler = filler, title = title)
+    msg = "{filler:<44}{title}{filler:>44}".format(filler = filler, title = title)
     logger.debug(msg)
 
 def get_loggers(name, rawlog, custom_path=None):
@@ -195,7 +195,7 @@ def get_loggers(name, rawlog, custom_path=None):
     else:
         rawloglevel = logging.CRITICAL
 
-    # logger
+    #logger
     logger = logging.getLogger(f'{name}')
     logger.setLevel(logging.DEBUG)
     fh = logging.FileHandler(filename=paths[0])
@@ -203,7 +203,7 @@ def get_loggers(name, rawlog, custom_path=None):
     logger.addHandler(fh)
     logger.debug(f"{name} test")
 
-    # rawlogger
+    #rawlogger
     rawlogger = logging.getLogger(f'{name}_raw')
     rawlogger.setLevel(rawloglevel)
     rawfh = logging.FileHandler(filename=paths[1])
@@ -214,7 +214,7 @@ def get_loggers(name, rawlog, custom_path=None):
     rawlogger.debug(f"{name} test")
     return logger, rawlogger
 
-def parse_hex_data_with_templates(hexdata: str, template: dict, octets_skip: (int | None) = None):
+def parse_hex_data_with_template(hexdata: str, template: dict, octets_skip: (int | None) = None):
     """
     Parses given hexdata string into labeled sections based on octets lengths
 
@@ -263,7 +263,7 @@ def parse_hex_data_with_templates(hexdata: str, template: dict, octets_skip: (in
     return results
 
 def set_sfd_and_code_ind(prf: PRFMode, rframe: RFrameConfig, in_sfd_id=None, in_preamble_code=None):
-    """Maps SFDJ id, number of sts segments and preamble code index.
+    """Maps SFD id, number of sts segments and preamble code index.
 
     Parameters are calculated based on provided PRF and RFrame values.
 
@@ -308,7 +308,7 @@ def _enum(t: CodeEnum|Enum, v: str|int):
         e = t(v)
     return e
 
-def get_cfg_list(cfg: dict, key: str, cast_type: _T|None = None, spearator = ','):
+def get_cfg_list(cfg: dict, key: str, cast_type: _T|None = None, separator = ','):
     """Parses config value as a list.
 
     Args:
@@ -323,13 +323,13 @@ def get_cfg_list(cfg: dict, key: str, cast_type: _T|None = None, spearator = ','
     Note:
         If ``cast_type`` is ``None`` list values are type of ``string``.
     """
-    values = cfg[key].replace(" ", "").split(spearator)
+    values = cfg[key].replace(" ", "").split(separator)
     if not cast_type:   # Raw string
         return values
     elif issubclass(cast_type, Enum): # Enum|CodeEnum
         return [_enum(cast_type, v) for v in values]
     else: # Any
-        return [cast_type(v) for v in vlaues]
+        return [cast_type(v) for v in values]
 
 def get_cfg_value(cfg: dict, key: str, cast_type: _T|None = None):
     """Parses config value.
@@ -337,7 +337,7 @@ def get_cfg_value(cfg: dict, key: str, cast_type: _T|None = None):
     Args:
         cfg: The dictionary
         key: The key
-        cast_Type: The casting type. Default to ``None``
+        cast_type: The casting type. Default to ``None``
 
     Returns:
         value: The returned value.
@@ -345,7 +345,7 @@ def get_cfg_value(cfg: dict, key: str, cast_type: _T|None = None):
     Note:
         If ``cast_type`` is ``None`` returned value is a ``string``.
     """
-    v = cfg[key].replace(" ", "")
+    v = cfg[key].replace(" ","")
     if not cast_type: # Raw string
         return v
     elif issubclass(cast_type, Enum): # Enum|CodeEnum
@@ -354,19 +354,19 @@ def get_cfg_value(cfg: dict, key: str, cast_type: _T|None = None):
         return cast_type(v) # Any
 
 def get_cfg_str(cfg: dict, key: str) -> str:
-    """Get string from config sction."""
-    return cfg[key].replace(" ", "")
+    """Get string from config section."""
+    return cfg[key].replace(" ","")
 
 def get_cfg_float(cfg: dict, key: str) -> float:
-    """Get float from config section. """
-    return float(cfg[key].replace(" ", ""))
+    """ Get float from config section. """
+    return float(cfg[key].replace(" ",""))
 
 def get_cfg_int(cfg: dict, key: str) -> int:
-    """Get int from config section.
+    """ Get int from config section.
 
-    Some debug configs may contain interger-like floats usch as
+    Some debug configs may contain interger-like floats such as
     "6.0" or "10.0". Accept them to keep the runner robust while still
-    rejecting real non-integer values such as "6.5"
+    rejecting real non-integer values such as "6.5".
     """
     value = cfg[key].replace(" ", "")
     try:
@@ -382,7 +382,7 @@ def get_cfg_section(cfg: dict, key: str) -> dict:
     return dict(cfg[key])
 
 def get_dut_settings(settings: dict):
-    """ Helping functions to parse config's DUT section. """
+    """ Helping function to parse config's DUT section. """
     test = get_cfg_str(settings, "test")
     dump_cir = get_cfg_value(settings, "dump_cir", Mode)
     rawlog = get_cfg_int(settings, "rawlog")
@@ -427,12 +427,12 @@ def get_all_settings(config_file: str = 'config.ini', test_name: (str | None) = 
     
     if test_name is None:
         # Get test settings
-        test_name = get_cfg_str(main_settings, "test")
+        test_name =  get_cfg_str(main_settings, "test")
 
     # Get test specific settings
     test_settings = get_cfg_section(config, test_name)
 
-    # NOTE: Optional
+    # NOTE: Optional.
     # Instrument settings might not used by every test.
     instrument_name = get_cfg_str(main_settings, "instrument")
     instr_settings = None
@@ -474,7 +474,7 @@ def get_test_iterations(**kwargs) -> list[dict]:
 """ Waveforms names builders. """
 
 def get_wv_file_name(**kwargs):
-    """Builds waveform file name based on test interation-kwargs."""
+    """Builds waveform file name based on test iteration-kwargs."""
     rframe: RFrameConfig = kwargs['rframe']
     preamble_code: int = kwargs['preamble_code_index']
     sfd_id: int = kwargs['sfd_id']
@@ -485,7 +485,7 @@ def get_wv_file_name(**kwargs):
     print(f"waveform: {wv_name}")
     return wv_name
 
-""" TPC function """
+""" TPC functions """
 
 def gen_payload(ptype: PayloadType, pay_length = 20, rand_seed: int = 22) -> str:
     match ptype:
@@ -496,10 +496,10 @@ def gen_payload(ptype: PayloadType, pay_length = 20, rand_seed: int = 22) -> str
             _temp = "{0:{1}>{2}}".format('', '00', pay_length)
         case PayloadType.ALL_ONE.value:
             _temp = "{0:{1}>{2}}".format('', 'FF', pay_length)
-        case PayloadType.ALL_FIZE.value:
+        case PayloadType.ALL_FIVE.value:
             _temp = "{0:{1}>{2}}".format('', '5', 2 * pay_length)
         case _:
-            _temp = '55555555555555555555555555555555555559e32'
+             _temp = '5555555555555555555555555555555555559e32'
     return _temp
 
 """ End of TPC functions """
@@ -509,23 +509,23 @@ def gen_payload(ptype: PayloadType, pay_length = 20, rand_seed: int = 22) -> str
 # convert bytearray to STS bits IQGIG format
 def bytesToBits(bytes:str|bytearray)->str:
 
-    if not isinstance(bytes, bytearray):    # type control
+    if not isinstance(bytes, bytearray):  # type control
         bytes = bytes.hex()
 
-    converted = ''.join(format(byte, '08b') for byte in bytes) # bit string 0101010.. MSB
-    return "(" + ','.join(f'{bit}' for bit in converted) + ")" # bit string (0,1,0,1,0,1,0,...) MSB
+    converted = ''.join(format(byte, '08b') for byte in bytes) #bit string 0101010.. MSB
+    return "(" + ','.join(f'{bit}' for bit in converted) + ")" # bit string (0,1,0,1,0,1,...) MSB
 
 def bytesToChips(bytes:str|bytearray, delta:int = 8)->str:
 
-    if isinstance(bytes, bytearray): # type control
+    if isinstance(bytes, bytearray):  # type control
         bytes = bytes.hex()
         bytes = bytesToBits(bytes)
 
     repl = ','.join("1"+"0"* (delta -1))
-    # bit 1 is negative pulse, bit 0 is positive pulse, each bit is 8 chips -> 1 carries data and 7 spacing zeros, MSB
-    return bytes.replace("1", "-1").replace("0", "1").replace("1", repl)
+    # bit 1 is negative pulse, bit 0 is positive pulse,  each bit is 8 chips -> 1 carries data and 7 spacing zeros, MSB
+    return bytes.replace("1","-1").replace("0","1").replace("1",repl)
 
-def savePkt(name: str, pkt: bytes):
+def savePkt(name: str, pkt: bytes) :
     bits = len(pkt) * 8
     f = open(name, 'wb')#f = open(name + '.dm_iqd', 'wb')
     f.write(bytes('{TYPE:SMU-DL}{COPYRIGHT:Rohde&Schwarz}{DATE:2024-10-22;13:35:18}', encoding='ascii'))
@@ -535,7 +535,7 @@ def savePkt(name: str, pkt: bytes):
     f.close()
 
 
-""" nd of Automated IQSIM function """
+""" End of Automated IQSIM functions """
 
 def is_dummy_test():
     return not (os.getenv('DUMMY_UWB_TEST') is None)

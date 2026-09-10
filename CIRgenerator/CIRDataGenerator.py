@@ -986,7 +986,7 @@ class CIRSimulator:
         self.cfg.frontend.frame_timing_jitter_std_bins = 0.0
 
         # -- Quantization (gain_deembedded domain) --
-        self.cfg.frontend.quantization_dc_offset_i = -15.164589709756694
+        self.cfg.frontend.quantization_dc_offset_i = -15.164589709756994
         self.cfg.frontend.quantization_dc_offset_q = -9.62612113856849
         # Derive bits/full_scale from step and full_scale_est in the fit
         q_step = 0.0001989999999999978
@@ -1226,7 +1226,7 @@ class CIRSimulator:
             self.cfg.targets = [
                 Target(
                     name="human_1",
-                    position_xy_m=(1.0, 0.2),
+                    position_xy_m=(1.0, -0.2),
                     amplitude=1.0,
                     width_m=0.25,
                     num_scatter_points=3,
@@ -1241,13 +1241,13 @@ class CIRSimulator:
                 ),
                 Target(
                     name="object_1",
-                    position_xy_m=(1.2, 0.25),
-                    amplitude=0.9,
-                    width_m=0.50,
-                    num_scatter_points=0,
+                    position_xy_m=(1.5, 0.25),
+                    amplitude=0.95,
+                    width_m=0.18,
+                    num_scatter_points=3,
                     orientation_deg=90.0,
                     material_type="metal",
-                    material_factor=1.4,
+                    material_factor=1.5,
                     enable_micro_motion=False,
                 )
             ]
