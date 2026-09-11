@@ -108,7 +108,7 @@ def _structured_to_injection(params: dict) -> dict:
     
     num_ant = _num_antennas(params)
     flat: dict = {}
-    float["noise"] = {
+    flat["noise"] = {
         "std_per_ant": _structured_white_fallback(params, num_ant),
     }
 
@@ -208,7 +208,7 @@ def _structured_to_injection(params: dict) -> dict:
             flat_ring[f"ring_freq_ant{antenna_index}"] = float(
                 ant["ring_freq_rad_per_tap"]
             )
-        flat["tx_rx_feedthrough_ringing"] = flat
+        flat["tx_rx_feedthrough_ringing"] = flat_ring
     
     return flat
 

@@ -65,7 +65,7 @@ HEX_UNSUPPORTED_MX_KEYS: Tuple[str, ...] = (
     "max_range_cm",
     "min_abs_velocity_mps",
     "calib_segments",
-    "min_dynamic_excees_db",
+    "min_dynamic_excess_db",
     "min_cells",
     "min_unique_taps",
     "min_range_span_cm",
