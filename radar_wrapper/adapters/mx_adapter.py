@@ -36,7 +36,7 @@ def _construct_with_supported_kwargs(cls, **kwargs):
     if has_var_kw:
         return cls(**kwargs)
 
-    supported = (
+    supported = {
         name
         for name, p in params.items()
         if name != "self"
@@ -44,7 +44,7 @@ def _construct_with_supported_kwargs(cls, **kwargs):
             inspect.Parameter.POSITIONAL_OR_KEYWORD,
             inspect.Parameter.KEYWORD_ONLY,
         )
-    )
+    }
 
     filtered = {
         key: value
@@ -63,18 +63,18 @@ def _construct_with_supported_kwargs(cls, **kwargs):
 
 
 class MXPostprocessingAdapter(PostprocessingAdapter):
-    """Replay adapter for MX postprocessing
+    """Replay adapter for MX postprocessing.
 
     Supported ingestion modes:
 
     1. complex
-        - Uses radar_processing.RadarDopplerProcessor.push_cir()
-        - Feeds complex ndarray directly
+       - Uses radar_processing.RadarDopplerProcessor.push_cir()
+       - Feeds complex ndarray directly
 
     2. hex
-        - Uses radar_utils_new.RadarPostprocessing.fill_data_by_hex()
-        - Converts complex CIR to Q8.8 hex first
-        - Closer to HW/log style ingestion path
+       - Uses radar_utils_new.RadarPostprocessing.fill_data_by_hex()
+       - Converts complex CIR to Q8.8 hex first
+       - Closer to HW/log style ingestion path
     """
 
     def __init__(self, cfg, run_dir=None) -> None:
@@ -96,7 +96,7 @@ class MXPostprocessingAdapter(PostprocessingAdapter):
         self._segment_idx = 0
 
     # ------------------------------------------------------------------
-    # Configure
+    # configure
     # ------------------------------------------------------------------
 
     def configure(self, cir: CIRData) -> None:
@@ -147,20 +147,39 @@ class MXPostprocessingAdapter(PostprocessingAdapter):
             import inspect
             print(f"[MX hex] radar_utils imported from: {mx_radar_utils.__file__}")
             print(
-                "[MX hex] RadarPostprocessing.__init__ signature: ",
+                "[MX hex] RadarPostprocessing.__init__ signature:",
                 inspect.signature(RadarPostprocessing.__init__),
             )
 
-        SEGMENT_LENGTH = getattr(
-            mx_radar_utils,
-            "SEGMENT_LENGTH",
-            self.cfg.getint("mx", "slow_time_size", fallback=256),
+        # Config wins over the legacy module constant.
+        #
+        # These two used to be read as gertattr(module, NAME, cfg_value), which
+        # inverted the precedence: radar_utils.py DOES define SEGMENT_LENGTH = 16
+        # and THRESHOLD = 8 at module level, so the module constant always won
+        # and the [mx] values were unreachable fallbacks.
+        #
+        # They are the ONLY two detection-relevant values the hex path can
+        # honour at all -- RadarPostprocessing.__init__ takes no other
+        # thresholds and never sees ConfigMapper.build_mx_params(), so the rest
+        # of [mx] is inert here (radar_wrapper/config.py warns about it).
+        #
+        # Both keys are hex-specific on purpose. The complex path's segment
+        # length and CFAR threshold are [mx] segment_size / cfar_threshold, whose
+        # defaults (32 / 7.0 dB) differ from the legacy hex constants (16 / 8 dB);
+        # reusing one key for two backends with different natural defaults is
+        # what made this confusing in the first place. configs/default.ini
+        # carries the legacy hex numbers, so wiring these up leaves every
+        # existing hex run bit-identical.
+        SEGMENT_LENGTH = self.cfg.getint(
+            "mx",
+            "slow_time_size",
+            fallback=getattr(mx_radar_utils, "SEGMENT_LENGTH", 16),
         )
 
-        THRESHOLD = getattr(
-            mx_radar_utils,
-            "THRESHOLD",
-            self.cfg.getfloat("mx", "cfar_threshold", fallback=0.0),
+        THRESHOLD = self.cfg.getfloat(
+            "mx",
+            "hex_cfar_threshold_db",
+            fallback=getattr(mx_radar_utils, "THRESHOLD", 8.0),
         )
 
         BEAM_DIRECTIONS_DEG = getattr(
@@ -224,11 +243,11 @@ class MXPostprocessingAdapter(PostprocessingAdapter):
 
             for ant_idx in range(min(num_antennas, 2)):
                 cir_tap = cir.data[frame_idx, ant_idx, :] * input_gain
-                
+
                 last_result = self.processor.push_cir(
                     rx_index=ant_idx,
                     sequence_id=frame_idx,
-                    cir=cir_tap
+                    cir=cir_tap,
                 )
 
                 if self.cfg.getboolean("mx", "verbose_push", fallback=False):
@@ -329,17 +348,17 @@ class MXPostprocessingAdapter(PostprocessingAdapter):
     def _drain_hex_target_queue(self, frame_idx: int) -> None:
         if self.target_queue is None:
             return
-        
+
         while not self.target_queue.empty():
             raw_item = self.target_queue.get()
             self._collect_hex_queue_item(raw_item, frame_idx=frame_idx)
 
     def _collect_hex_queue_item(self, raw_item, frame_idx: int) -> None:
-        """Convert RadarPostprocessing queue output to warpper Detection.
+        """Convert RadarPostprocessing queue output to wrapper Detection.
 
         The old MX path often pushes either:
         - list[dict]
-        - list[target-like object]
+        - list[target-like objects]
         - a single dict
         - a backend-specific result object
 
