@@ -19,14 +19,14 @@ from typing import Tuple
 # Recognised configuration surface
 # ---------------------------------------------------------------------------
 
-#: Every section the wrapper reads. An recognised section is hard error
+#: Every section the wrapper reads. An unrecognised section is a hard error
 #: because a section-name typo cannot be recovered from downstream: configparser
 #: treats "[mx ]" (trailing space) as a section distinct from "[mx]", so the
 #: whole block silently becomes dead config and the run proceeds with defaults.
 #: That exact typo sat in configs/pipelines/synthetic_mx_validation.ini from
 #: 2026-08-13 until it was found by this audit, and it was inherited by a
 #: teammate who copied that file. See docs/standard_validation_geometry.md.
-KNOWN_SENCTIONS: Tuple[str, ...] = (
+KNOWN_SECTIONS: Tuple[str, ...] = (
     "run",
     "input",
     "synthetic",
@@ -42,7 +42,7 @@ KNOWN_SENCTIONS: Tuple[str, ...] = (
 #: configured from CIRMetadata (radar_wrapper/porting/config_mapper.py), and for
 #: a synthetic run SyntheticCIRSource fills those metadata fields from the
 #: CIRgenerator platform INI's actual generated shape / [radar] period / [cir]
-#: bin_time_s -- not from this sections. Setting them here looks effective and
+#: bin_time_s -- not from this section. Setting them here looks effective and
 #: is not.
 SYNTHETIC_IGNORED_RADAR_KEYS: Tuple[str, ...] = (
     "num_taps",
@@ -54,7 +54,7 @@ SYNTHETIC_IGNORED_RADAR_KEYS: Tuple[str, ...] = (
 #: a different class from RadarDopplerProcessor (complex): its constructor takes
 #: no detection thresholds at all and it never sees
 #: ConfigMapper.build_mx_params(), so these keys reach nothing under
-#: ingest_mode = hex. Meausred: with hex, cfar_threshold 0 vs 30 dB and
+#: ingest_mode = hex. Measured: with hex, cfar_threshold 0 vs 30 dB and
 #: min_dynamic_excess_db 0 vs 30 both give the same detections; with complex the
 #: same sweep gives 9 vs 0. Use ingest_mode = complex to tune thresholds.
 HEX_UNSUPPORTED_MX_KEYS: Tuple[str, ...] = (
@@ -167,14 +167,14 @@ def _reject_unknown_sections(cfg: configparser.ConfigParser) -> None:
     a *silent* one. "[mx ]" parses fine, shadows nothing, and leaves the run
     using configs/default.ini's thresholds while appearing to override them.
     """
-    unknown = [section for section in cfg.sections() if section not in KNOWN_SENCTIONS]
+    unknown = [section for section in cfg.sections() if section not in KNOWN_SECTIONS]
     if not unknown:
         return
 
     hints = []
     for section in unknown:
         stripped = section.strip()
-        if stripped in KNOWN_SENCTIONS and stripped != section:
+        if stripped in KNOWN_SECTIONS and stripped != section:
             hints.append(
                 f"  [{section}] -> did you mean [{stripped}]? "
                 "(surrounding whitespace is part of the section name)"
@@ -186,7 +186,7 @@ def _reject_unknown_sections(cfg: configparser.ConfigParser) -> None:
         "unrecognised config section(s):\n"
         + "\n".join(hints)
         + "\nKnown sections: "
-        + ", ".join(KNOWN_SENCTIONS)
+        + ", ".join(KNOWN_SECTIONS)
     )
 
 
@@ -198,7 +198,7 @@ def _warn_ineffective_keys(
     """Warn about keys that are present, look effective, and are not.
 
     A warning rather than an error: these keys are shipped in
-    configs/default.ini, so erroring would rejecte every existing config. The
+    configs/default.ini, so erroring would reject every existing config. The
     point is that a reader of an INI cannot otherwise tell that a value is dead.
     """
     if source == "synthetic" and cfg.has_section("radar"):
@@ -229,7 +229,7 @@ def _warn_ineffective_keys(
                     "thresholds: "
                     + ", ".join(present)
                     + ". The hex path uses RadarPostprocessing, whose constructor "
-                    "accepts no thesholds and which never sees "
+                    "accepts no thresholds and which never sees "
                     "ConfigMapper.build_mx_params(). Set ingest_mode = complex to "
                     "make them effective.",
                     stacklevel=3,
@@ -245,7 +245,7 @@ def _warn_ineffective_keys(
             # non-near-zone-blocked) code path falls off the end of the
             # function and returns None implicitly; push_cir()'s
             # `except Exception: pass` around result.rx_health then swallows
-            # the resulting AttributeError, so nothing raises. Meausred: 7
+            # the resulting AttributeError, so nothing raises. Measured: 7
             # detections / 12 non-None segments with debug_enable = true vs 0 /
             # 2 with it false, on the identical CIR. MX_CodeV1_Mustafa is
             # legacy and untouched (CLAUDE.md), so this can only be caught

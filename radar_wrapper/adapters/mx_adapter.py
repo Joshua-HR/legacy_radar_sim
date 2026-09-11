@@ -153,7 +153,7 @@ class MXPostprocessingAdapter(PostprocessingAdapter):
 
         # Config wins over the legacy module constant.
         #
-        # These two used to be read as gertattr(module, NAME, cfg_value), which
+        # These two used to be read as getattr(module, NAME, cfg_value), which
         # inverted the precedence: radar_utils.py DOES define SEGMENT_LENGTH = 16
         # and THRESHOLD = 8 at module level, so the module constant always won
         # and the [mx] values were unreachable fallbacks.

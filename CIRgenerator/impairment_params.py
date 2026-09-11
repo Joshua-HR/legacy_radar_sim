@@ -1,8 +1,8 @@
 """Load and inject measurement-fitted impairment parameters.
 
-Suppoerted schemas
+Supported schemas
 ------------------
-* v2 canonical structued schema produced by
+* v2 canonical structured schema produced by
   ``notebooks/impairment_fitting.py``.  It uses the exact two-term static
   model plus ``noise.stochastic`` (complex-gain AR(1) + per-tap additive
   complex AR(1)).
@@ -47,7 +47,7 @@ def load_case_params(path: Union[str, Path]) -> dict:
 
 
 def _detect_schema(params: dict) -> str:
-    """Return ``v2``, ``structued``, or ``legacy``."""
+    """Return ``v2``, ``structured``, or ``legacy``."""
 
     schema = params.get("schema", {})
     if (
@@ -72,7 +72,7 @@ def _num_antennas(params: Mapping[str, Any], default: int = 2) -> int:
 
 
 def _structured_white_fallback(params: Mapping[str, Any], num_ant: int) -> list[float]:
-    """Return a variance-perserving scalar fallback for old readers."""
+    """Return a variance-preserving scalar fallback for old readers."""
 
     noise = params.get("noise", {})
     explicit = noise.get("fallback_white_component_std_per_ant")
@@ -104,16 +104,16 @@ def _structured_white_fallback(params: Mapping[str, Any], num_ant: int) -> list[
 
 
 def _structured_to_injection(params: dict) -> dict:
-    """Normalize either structured schema into the old flat assignmnet shape."""
-    
+    """Normalize either structured schema into the old flat assignment shape."""
+
     num_ant = _num_antennas(params)
     flat: dict = {}
     flat["noise"] = {
         "std_per_ant": _structured_white_fallback(params, num_ant),
     }
 
-    if _detect_schema(params) == 'v2':
-        # keep the complete canonical object for FittedImpairmentModel validation
+    if _detect_schema(params) == "v2":
+        # Keep the complete canonical object for FittedImpairmentModel validation
         # and installation.  The scalar fallback above is never used when the
         # simulator implements the v2 runtime, but remains useful to old tools.
         flat["_v2_fitted_model_params"] = copy.deepcopy(params)
@@ -122,18 +122,18 @@ def _structured_to_injection(params: dict) -> dict:
 
     fd = params.get("frame_drift", {})
     phase_compat = fd.get(
-        "phase_drift_sfd",
+        "phase_drift_std",
         [float(fd.get("common_phase_circular_std_rad", 0.0)) for _ in range(num_ant)],
     )
     flat["frame_drift"] = {
         "amplitude_drift_std": float(fd.get("common_amplitude_std", 0.0)),
         "timing_jitter_std_bins": float(fd.get("fractional_timing_jitter_std_bins", 0.0)),
-        "phase_drift_std": [float(v) for v in phase_compat]
+        "phase_drift_std": [float(v) for v in phase_compat],
     }
 
     # Preserve gain_deembedding so apply_case_params_to_cfg can inject
     # rx1_gain/rx2_gain from the fit (structured JSONs carry this at top
-    # level; legecy JSONs already have it, so the .get default is a no-op
+    # level; legacy JSONs already have it, so the .get default is a no-op
     # for them).
 
     flat["gain_deembedding"] = params.get("gain_deembedding", {})
@@ -145,9 +145,9 @@ def _structured_to_injection(params: dict) -> dict:
     phase_slopes: list[float] = []
     for antenna_index in range(num_ant):
         ant = tf[f"ant{antenna_index}"]
-        flat_tf[f"amp_ant{antenna_index}"] = ant["amp"]
-        flat_tf[f"decay_ant{antenna_index}"] = ant["decay"]
-        flat_tf[f"phase_ant{antenna_index}_rad"] = ant["phase_rad"]
+        flat_tf[f"amp_ant{antenna_index}"] = float(ant["amp"])
+        flat_tf[f"decay_ant{antenna_index}"] = float(ant["decay"])
+        flat_tf[f"phase_ant{antenna_index}_rad"] = float(ant["phase_rad"])
         flat_tf[f"ripple_amp_ant{antenna_index}"] = 0.0
         flat_tf[f"ripple_freq_ant{antenna_index}"] = 0.0
         flat_tf[f"noise_std_used_ant{antenna_index}"] = 0.0
@@ -166,7 +166,7 @@ def _structured_to_injection(params: dict) -> dict:
 
     ringing = params.get("tx_rx_feedthrough_ringing")
     if ringing is not None:
-        first_enabled = next (
+        first_enabled = next(
             (
                 ringing[f"ant{antenna_index}"]
                 for antenna_index in range(num_ant)
@@ -179,36 +179,36 @@ def _structured_to_injection(params: dict) -> dict:
                 "start_tap": int(first_enabled["start_tap"]),
                 "num_taps": int(first_enabled["num_taps"]),
             }
-        for antenna_index in range(num_ant):
-            ant = ringing[f"ant{antenna_index}"]
-            if not ant.get("enabled", True):
-                flat_ring[f"offset_amp_ant{antenna_index}"] = 0.0
-                flat_ring[f"offset_phase_ant{antenna_index}_rad"] = 0.0
-                flat_ring[f"ring_amp_ant{antenna_index}"] = 0.0
-                flat_ring[f"ring_decay_ant{antenna_index}"] = 0.0
-                flat_ring[f"ring_phase_ant{antenna_index}_rad"] = 0.0
-                flat_ring[f"ring_freq_ant{antenna_index}"] = 0.0
-                continue
-            if (
-                int(ant["start_tap"]) != flat_ring["start_tap"]
-                or int(ant["num_taps"]) != flat_ring["num_taps"]
-            ):
-                raise ValueError(
-                    "all antennas must share the same ringing start_num_tap/num_taps"
+            for antenna_index in range(num_ant):
+                ant = ringing[f"ant{antenna_index}"]
+                if not ant.get("enabled", True):
+                    flat_ring[f"offset_amp_ant{antenna_index}"] = 0.0
+                    flat_ring[f"offset_phase_ant{antenna_index}_rad"] = 0.0
+                    flat_ring[f"ring_amp_ant{antenna_index}"] = 0.0
+                    flat_ring[f"ring_decay_ant{antenna_index}"] = 0.0
+                    flat_ring[f"ring_phase_ant{antenna_index}_rad"] = 0.0
+                    flat_ring[f"ring_freq_ant{antenna_index}"] = 0.0
+                    continue
+                if (
+                    int(ant["start_tap"]) != flat_ring["start_tap"]
+                    or int(ant["num_taps"]) != flat_ring["num_taps"]
+                ):
+                    raise ValueError(
+                        "all antennas must share the same ringing start_num_tap/num_taps"
+                    )
+                flat_ring[f"offset_amp_ant{antenna_index}"] = float(ant["offset_amp"])
+                flat_ring[f"offset_phase_ant{antenna_index}_rad"] = float(
+                    ant["offset_phase_rad"]
                 )
-            flat_ring[f"offset_amp_ant{antenna_index}"] = float(ant["offset_amp"])
-            flat_ring[f"offset_phase_ant{antenna_index}_rad"] = float(
-                ant["offset_phase_rad"]
-            )
-            flat_ring[f"ring_amp_ant{antenna_index}"] = float(ant["ring_amp"])
-            flat_ring[f"ring_decay_ant{antenna_index}"] = float(ant["ring_decay"])
-            flat_ring[f"ring_phase_ant{antenna_index}_rad"] = float(
-                ant["ring_phase_rad"]
-            )
-            flat_ring[f"ring_freq_ant{antenna_index}"] = float(
-                ant["ring_freq_rad_per_tap"]
-            )
-        flat["tx_rx_feedthrough_ringing"] = flat_ring
+                flat_ring[f"ring_amp_ant{antenna_index}"] = float(ant["ring_amp"])
+                flat_ring[f"ring_decay_ant{antenna_index}"] = float(ant["ring_decay"])
+                flat_ring[f"ring_phase_ant{antenna_index}_rad"] = float(
+                    ant["ring_phase_rad"]
+                )
+                flat_ring[f"ring_freq_ant{antenna_index}"] = float(
+                    ant["ring_freq_rad_per_tap"]
+                )
+            flat["tx_rx_feedthrough_ringing"] = flat_ring
     
     return flat
 
@@ -234,7 +234,7 @@ def apply_case_params_to_cfg(cfg: Any, case_params: dict) -> None:
 
     # ------------------------------------------------------------------
     # Legacy scalar noise fallback.  v2 later zeroes this and installs the
-    # complete stochastic model, so there is never doubling counting.
+    # complete stochastic model, so there is never double counting.
     # ------------------------------------------------------------------
     noise_cfg = case_params.get("noise", {})
     noise_std_per_ant = noise_cfg.get("std_per_ant")
@@ -254,11 +254,11 @@ def apply_case_params_to_cfg(cfg: Any, case_params: dict) -> None:
         cfg.cir.noise_amp_proportional_factor = [float(v) for v in amp_factor]
 
     # ------------------------------------------------------------------
-    # Rx gain de-embedding: inject the measured per-antenna RX gains
+    # RX gain de-embedding: inject the measured per-antenna RX gains
     # from the fit so metadata and the legacy noise-scaling fallback
     # (_generate_one_frame line ~2219) see the real values.  When the fit
     # supplies per-antenna noise_std the noise path already skips the
-    # rx_gain rescale (see the "No RX-gain rescaler here" comment there),
+    # rx_gain rescale (see the "No RX-gain rescale here" comment there),
     # so this only affects metadata + the legacy noise_std-only fallback.
     # ------------------------------------------------------------------
     gain_deemb = case_params.get("gain_deembedding", {})
@@ -279,7 +279,7 @@ def apply_case_params_to_cfg(cfg: Any, case_params: dict) -> None:
         # once at construction; we must refresh it after changing rx1/rx2_gain).
         cfg.radar.rx_gains = [cfg.radar.rx1_gain, cfg.radar.rx2_gain]
 
-    # Fontend stays off in the fitted reproduction path.  The v2 residual
+    # Frontend stays off in the fitted reproduction path.  The v2 residual
     # already contains the measured quantization floor.
     cfg.frontend.enable_adc_clipping = False
     cfg.frontend.enable_pulse_spreading = False
@@ -287,9 +287,9 @@ def apply_case_params_to_cfg(cfg: Any, case_params: dict) -> None:
 
     quantization = case_params.get("quantization", {})
     q = quantization.get("gain_deembedded", quantization)
-    if q.get("step") and q["step"] > 0.0:
+    if q.get("step") and float(q["step"]) > 0.0:
         step = float(q["step"])
-        max_level = max(q["full_scale_est"] / step, 1.0)
+        max_level = max(float(q["full_scale_est"]) / step, 1.0)
         bits = int(np.clip(np.ceil(np.log2(max_level + 1)) + 1, 4, 16))
         cfg.frontend.quantization_bits = bits
         cfg.frontend.quantization_full_scale = float(q["full_scale_est"])
@@ -352,16 +352,16 @@ def apply_case_params_to_cfg(cfg: Any, case_params: dict) -> None:
             float(feedthrough.get(f"noise_std_used_ant{antenna_index}", 0.0)),
         )
 
-    phase_slope = case_params.get("_tx_rx_feedthrough_phase_slope_per_ant")
-    if phase_slope is not None:
-        for antenna_index, slope in enumerate(phase_slope):
+    phase_slopes = case_params.get("_tx_rx_feedthrough_phase_slope_per_ant")
+    if phase_slopes is not None:
+        for antenna_index, slope in enumerate(phase_slopes):
             setattr(
                 leakage,
                 f"tx_rx_feedthrough_phase_slope_ant{antenna_index}",
                 float(slope),
             )
 
-    radiation = case_params.get("radiation_leakage")
+    radiation = case_params.get("radiation_leakage", {})
     leakage.enable_radiation_leakage = False
     leakage.radiation_delay_bins = int(radiation.get("delay_bins", 0))
     leakage.radiation_leakage_factor_12 = float(radiation.get("factor_12", 0.0))
