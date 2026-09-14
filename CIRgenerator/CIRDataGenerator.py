@@ -16,6 +16,16 @@ from entities import *
 from exporter import *
 from impairment_params import apply_case_params_to_cfg
 import ego_motion
+import target_override
+
+try:
+    from fitted_impairment import(
+        apply_fitted_noise_from_config,
+    )
+except ImportError:
+    from CIRgenerator.fitted_impairment import (
+        apply_fitted_noise_from_config,
+    )
 
 db_to_linear_amplitude = lambda gain_db: 10.0 ** (gain_db / 20.0)
 @dataclass
@@ -49,10 +59,14 @@ class SimulationConfig:
     """Radar ego motion (slow-time radar pose). Default type="static" is inert
     and takes a bit-identical legacy fast path. Set from the optional
     [radar_motion] INI section by create_default_config()."""
+    target_override: TargetOverrideConfig = field(default_factory=TargetOverrideConfig)
+    """Per-target kinematics deviations applied on top of the resolved
+    target_profile. Default (empty) is inert. Set from the optional
+    [target_override] INI section by create_default_config()."""
     targets: List[Target] = field(default_factory=list)
     static_clutter: List[StaticClutterPath] = field(default_factory=list)
 
-    #metadata
+    #metadata:
     radar: RadarTestConfig = field(default_factory=RadarTestConfig)
     dut: DUTConfig = field(default_factory=DUTConfig)
     build: BuildInfo = field(default_factory=BuildInfo)
@@ -247,9 +261,9 @@ def create_default_config(
         # given its own CSV) still gets a real measured pattern rather than
         # silently falling back to the all-zero-dBi isotropic default.
         cfg.antenna.pattern_gains_dbi_2d = cfg.antenna.pattern_gains_dbi_2d_per_ant[0]
-        
+
     # num_antennas count, reused below for per-antenna list validation.
-    # 
+    #
     # Note: the legacy [feedthrough] INI section is intentionally not read.
     # Feedthrough / early-leakage are driven entirely by the per-antenna
     # scalars set in _update_derived_hardware_params() (built-in profiles) or
@@ -293,7 +307,7 @@ def create_default_config(
         "enable_frame_drift",
     )
 
-    # Metadata
+        # Metadata
     cfg.radar.test_name = parser.get(
         "radar",
         "test_name",
@@ -376,7 +390,7 @@ def create_default_config(
         # here: _apply_room_profile() unconditionally overwrites both from
         # the room_profile name, so an INI value here would be silently
         # clobbered.
-        
+
     # Radar ego motion. [radar_motion] is optional (omitted == static ==
     # bit-identical legacy behavior), but WITHIN the section the surface is
     # strict: ego_motion.validate_ini_keys() rejects any unknown key and any
@@ -406,7 +420,7 @@ def create_default_config(
                 "extrapolation",
                 parser.get(section, "extrapolation", fallback=cfg.radar_motion.extrapolation),
             )
-        
+
         elif cfg.radar_motion.type == "handheld_jitter":
             if parser.has_option(section, "translation_rms_local_m"):
                 cfg.radar_motion.translation_rms_local_m = tuple(
@@ -433,6 +447,26 @@ def create_default_config(
     # visible in the saved config even for static runs.
     cfg.radar_motion.scenario_dir = str(ini_path.resolve().parent)
 
+    # Per-target kinematics deviations. [target_override] is optional (omitted
+    # == bit-identical legacy behavior), but WITHIN the section the surface is
+    # strict for the same reason [radar_motion] is: the engine's failure mode
+    # for a bad target value is silence, not an exception. An unrecognised
+    # micro_motion_axis is silently treated as "radial" and a non-positive
+    # micro_motion amplitude early-returns, so a typo produces a
+    # plausible-looking CIR. Only the values are validated here; the target
+    # indices cannot be checked until _apply_target_profile() has run.
+    if parser.has_section(target_override.INI_SECTION):
+        section = target_override.INI_SECTION
+        # parser.items() folds in [DEFAULT] keys, which are not this section's
+        # own and must not be mistaken for override keys.
+        defaults = parser.defaults()
+        section_items = [
+            (key, value)
+            for key, value in parser.items(section)
+            if key not in defaults
+        ]
+        cfg.target_override.entries = target_override.parse_ini_items(section_items)
+
     return cfg
 
 
@@ -450,6 +484,7 @@ class CIRSimulator:
         self._apply_hardware_profile()
         self._apply_room_profile()
         self._apply_target_profile()
+        self._apply_target_override()
         self._sync_target_frame_period()
         self._update_derived_hardware_params()
 
@@ -496,7 +531,7 @@ class CIRSimulator:
             self.cfg.scene.radar_position_y_m,
             rz,
         ], dtype=float)
-    
+
     def _build_antenna_positions(self) -> np.ndarray:
         """
         Build 3D antenna geometry.
@@ -534,9 +569,9 @@ class CIRSimulator:
     # Pipeline boundary, enforced here and nowhere else:
     #
     #   slow_time + configured base pose
-    #       -> pose trajectory (one pose per slow-time sample)
-    #       -> Tx/Rx antenna phase-centre world coordinates
-    #       -> path geometry -> delay -> carrier phase -> Doppler
+    #     -> pose trajectory (one pose per slow-time sample)
+    #     -> Tx/Rx antenna phase-centre world coordinates
+    #     -> path geometry -> delay -> carrier phase -> Doppler
     #
     # The motion model never writes a CIR phase or a tap. It only moves the
     # antenna phase centres; _generate_one_frame() then recomputes distance ->
@@ -547,7 +582,7 @@ class CIRSimulator:
     # Impairments are strictly downstream: _apply_tx_rx_feedthrough*,
     # _apply_radiation_leakage, _apply_pcb_leakage, _apply_early_leakage,
     # _apply_rx_gain, _apply_adc_clipping, _apply_quantization and the noise
-    # block all run after the geometry loop and take no pose argument. Tx->Rx
+    # block all run after the geometry loop and take no pose argument. TX->RX
     # coupling is body-fixed, so that is physically correct as well as
     # structurally convenient.
     # -----------------------------------------------------------------------
@@ -676,7 +711,7 @@ class CIRSimulator:
         """
         if self.ego_pose_log is None:
             return self._ego_base_pose
-        
+
         return self.ego_pose_log[frame_idx]
 
     def _radar_origin_at_frame(self, frame_idx: int) -> np.ndarray:
@@ -792,7 +827,7 @@ class CIRSimulator:
         else:
             raise ValueError("Unsupported hardware_profile.")
 
-    
+
     def _update_derived_hardware_params(self):
         """
         Compute adaptive hardware/leakage parameters from the main config.
@@ -857,7 +892,7 @@ class CIRSimulator:
             else:
                 self.cfg.leakage.pcb_leakage_factor_12 = pcb * 0.60
                 self.cfg.leakage.pcb_leakage_factor_21 = pcb * 1.40
-            
+
             self.cfg.leakage.pcb_phase_offset_12_rad = 0.03
             self.cfg.leakage.pcb_phase_offset_21_rad = -0.03
             self.cfg.leakage.pcb_delay_bins = 0
@@ -1004,16 +1039,16 @@ class CIRSimulator:
         """Load a case*_params.json fit and inject it via the shared injector.
 
         Used by the config-driven ``hardware_profile == "fitted"``. Reuses the
-        exact field injection of 
+        exact field injection of
         ``validation/cir_validation_adapter.build_injected_simulator`` through
         ``impairment_params.apply_case_params_to_cfg``.
 
         A relative ``path`` is resolved against the project root (the parent of
         this CIRgenerator package) so it works regardless of CWD. Guards:
-            * fit ``num_antennas`` must match ``cfg.num_antennas`` (hard error);
-            * a ``num_taps`` mismatch vs ``cfg.cir.num_bins`` is warned but
-              ``cfg.cir.num_bins`` stays authoritative (the tap-indexed
-              feedthrough/ringing params assume the fit's tap grid).
+          * fit ``num_antennas`` must match ``cfg.num_antennas`` (hard error);
+          * a ``num_taps`` mismatch vs ``cfg.cir.num_bins`` is warned but
+            ``cfg.cir.num_bins`` stays authoritative (the tap-indexed
+            feedthrough/ringing params assume the fit's tap grid).
         """
         if not path:
             raise ValueError(
@@ -1035,7 +1070,7 @@ class CIRSimulator:
         if fit_antennas is not None and int(fit_antennas) != self.cfg.num_antennas:
             raise ValueError(
                 f"hardware_params_json num_antennas ({fit_antennas}) != "
-                f"cfg.mnum_antennas ({self.cfg.num_antennas}): {json_path}"
+                f"cfg.num_antennas ({self.cfg.num_antennas}): {json_path}"
             )
 
         fit_taps = meta.get("num_taps")
@@ -1061,7 +1096,7 @@ class CIRSimulator:
         self.cfg.scene.radar_placement_mode = "center"
         self.cfg.scene.enable_default_room_clutter = False
         self.cfg.enable_baseline_subtraction = False
-        
+
         if profile == "anechoic_like":
             pass
 
@@ -1687,7 +1722,7 @@ class CIRSimulator:
         #save targets lists
         original_targets = self.cfg.targets
         self.cfg.targets = []
-        #empty rrom
+        #empty room
         baseline_frame, _ = self._generate_one_frame(frame_idx=0)
         #restore targets
         self.cfg.targets = original_targets
@@ -2028,7 +2063,7 @@ class CIRSimulator:
             # sqrt(sigma/N) via _radar_equation_amplitude_factor. This keeps the
             # incoherent (energy) sum equal to sigma regardless of N -- RCS is an
             # energy-like quantity. The previous 1/N AMPLITUDE normalisation made
-            # total energy fall as 1/N, so a finely-discertised target was
+            # total energy fall as 1/N, so a finely-discretised target was
             # silently dimmer than a coarse one.
             rcs_share_m2 = collider.rcs_m2 / max(len(scatter_points), 1)
 
@@ -2195,6 +2230,8 @@ class CIRSimulator:
 
             cir_data[frame_idx] = cir_frame
             truth.append(frame_truth)
+
+        cir_data = apply_fitted_noise_from_config(cir_data, self.cfg)
         
         if plot:
             plot_total(

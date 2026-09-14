@@ -17,7 +17,7 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
     plt = None
 
-SPPED_OF_LIGHT = 299_792_458.0
+SPEED_OF_LIGHT = 299_792_458.0
 CHANNEL_FREQ_HZ = {
     5: 6489.6e6,
     6: 6988.8e6,
@@ -164,7 +164,7 @@ class ProcessingConfig:
 
     @property
     def pri_s(self) -> float:
-        """Pulse-Repitition-Interval (seconds)"""
+        """Pulse-Repetition-Interval (seconds)"""
         return self.period_ms * 1e-3
 
     @property
@@ -175,7 +175,7 @@ class ProcessingConfig:
     @property
     def wavelength_m(self) -> float:
         """Radar wavelength (m) = c / fo"""
-        return SPPED_OF_LIGHT / self.center_freq_hz
+        return SPEED_OF_LIGHT / self.center_freq_hz
 
 
 class RadarDopplerProcessor:
@@ -304,7 +304,7 @@ class RadarDopplerProcessor:
             self.segment.fill(0)                                            # Initialize entire buffer to 0
             self.valid.fill(False)                                          # Set all valid flags to False
             self.write_idx = 0                                              # Reset write index to 0
-        push_timings["processor_push window_shift_ms"] = float((time.perf_counter() - t_stage) * 1000.0)    # Record time taken for hiop/shift operation
+        push_timings["processor_push_window_shift_ms"] = float((time.perf_counter() - t_stage) * 1000.0)    # Record time taken for hiop/shift operation
 
 
         if not process_segment or segment_copy is None: # Terminate here if not a valid segment
@@ -949,7 +949,7 @@ class RadarDopplerProcessor:
 
             # Debug: Print velocity/doppler info
             print(f"[DBG Plot] velocity_mps range: [{self.velocity_mps[0]:.3f}, {self.velocity_mps[-1]:.3f}] m/s")
-            print(f"[DBG Plot] doppler_hz range: [{self.doppler_hz[0]:.1f}, {self.doppler_hz[-1]:1f}] Hz")
+            print(f"[DBG Plot] doppler_hz range: [{self.doppler_hz[0]:.1f}, {self.doppler_hz[-1]:.1f}] Hz")
             print(f"[DBG Plot] segment_size={self.cfg.segment_size}, period_ms={self.cfg.period_ms}, PRF={1000/self.cfg.period_ms:.1f} Hz")
             print(f"[DBG Plot] wavelength={self.cfg.wavelength_m:.4f} m, channel={self.cfg.channel}")
 
@@ -1026,7 +1026,7 @@ class RadarDopplerProcessor:
                         y = float(self.doppler_hz[det.doppler_index])
                     else:   # dopploer_bin
                         y = det.doppler_index
-                    ax.plot(x, y, 'b+', markersize=15, markerdegewidth=2)
+                    ax.plot(x, y, 'b+', markersize=15, markeredgewidth=2)
                 plt.colorbar(im2, ax=ax)
                 ax.set_xlim(x_min, x_max/4)
                 ax.set_ylim(y_min, y_max)
@@ -1055,7 +1055,7 @@ class RadarDopplerProcessor:
                         y_vals = [int((t.velocity_mps / v_max) * (n_dop / 2) + n_dop / 2) for t in targets]
 
                     scores = [t.score for t in targets]
-                    scatter = ax.scatter(x_vals, y_vals, c=scores, s=100, alpha=0.7, camp='viridis')
+                    scatter = ax.scatter(x_vals, y_vals, c=scores, s=100, alpha=0.7, cmap='viridis')
                     ax.set_title(f"Targets ({len(targets)})")
                     ax.set_xlabel(x_label)
                     ax.set_ylabel(y_label)
@@ -1128,7 +1128,7 @@ class RadarDopplerProcessor:
             for rx in range(2):
                 #im1 = axes[2, rx].imshow(20*np.log10(np.abs(x[rx]) + eps), aspect='auto', origin='lower', cmap='jet')
                 im1 = axes[2, rx].imshow(20*np.log10(np.abs(x[rx]) + 1e-4), aspect='auto', origin='lower', cmap='jet')
-                axes[2, rx].set_title(f"x (windowed Rx{rx} (dB)")
+                axes[2, rx].set_title(f"x (windowed) Rx{rx} (dB)")
                 axes[2, rx].set_xlabel("Tap")
                 axes[2, rx].set_ylabel("Frame")
                 #axes[2, rx].set_xlim(0, 64)
@@ -1183,7 +1183,7 @@ class RadarDopplerProcessor:
             min_ex = float(getattr(cfg, "cir_centroid_min_excess_db", 5.0))
             min_weight = float(getattr(cfg, "cir_centroid_min_total_weight", 2.0))
             usable = np.asarray(valid_map, dtype=bool) & np.isfinite(dynamic_excess_db) & np.isfinite(power_db)
-            usable &= power_db >= float(getattr(cfg, "bad_rx_floor_db_threshold", -100.0))
+            usable &= power_db > float(getattr(cfg, "bad_rx_floor_db_threshold", -100.0))
             if not np.any(usable):
                 self.cir_centroid_history.append({
                     "segment_id": float(self.segment_id),
@@ -1360,7 +1360,7 @@ class RadarDopplerProcessor:
             sid = float(item.get("segment_id", float("nan")))
             if not (np.isfinite(r) and np.isfinite(v) and np.isfinite(sc) and np.isfinite(sid)):
                 continue
-            if abs(v) < float(cfg.track_min_abs_velocity_abs):
+            if abs(v) < float(cfg.track_min_abs_velocity_mps):
                 continue
             if sc < float(cfg.track_min_score):
                 continue
@@ -1452,7 +1452,7 @@ class RadarDopplerProcessor:
             return False, {
                 "ready": False,
                 "raw_change": False,
-                "persistenct": False,
+                "persistent": False,
                 "active_taps": [],
                 "best_tap": None,
                 "best_range_cm": None,
@@ -1622,7 +1622,7 @@ class RadarDopplerProcessor:
 
     def _group_detections(self, detections: list[Detection]) -> list[GroupedTarget]:
         """
-        Group the input single detections (Detection) list by range/velocity/angle criteria,
+        Group the input single detection (Detection) list by range/velocity/angle criteria,
         calculate representative values (weighted average, max, etc.) per group,
         and return a list of `GroupedTarget` objects.
         """
