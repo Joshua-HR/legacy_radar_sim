@@ -48,7 +48,7 @@ TWIN_1500_US    = 1500
 TWIN_1000_US    = 1000
 TWIN_750_US     = 750
 TWIN_500_US     = 500
-TIME_INFINITE   = 0
+TWIN_INFINITE   = 0
 
 class Device(Enum):
     U100 = 'U100',
