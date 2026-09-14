@@ -708,7 +708,7 @@ class RadarDopplerProcessor:
             for other in all_targets:
                 if other is t:          # Skip self
                     continue
-                if other.unique_taps:   # Other must also be single-tap
+                if other.unique_taps > 1:   # Other must also be single-tap
                     continue
                 same_range = abs(other.range_cm - t.range_cm) <= 15.0               # Range difference <= 15 cm
                 opposite_velocity = abs(other.velocity_mps + t.velocity_mps) <= float(cfg.symmetric_velocity_gate_mps)  # Velocity sign opposite, absolute value <= gate

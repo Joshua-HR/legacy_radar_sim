@@ -18,7 +18,7 @@ deviations use the I/Q-component convention
 
 This module has no dependency on ``CIRDataGenerator``.  It can therefore be
 used by fitting scripts, validation code, and the low-level config injector
-withouth creating an import cycle.
+without creating an import cycle.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from scipy.optimize import least_squares
 EPS = 1e-12
 SCHEMA_NAME = "radarsim.two_term_fitted_impairment"
 SCHEMA_VERSION = 2
-RNG_STREAM_TAG = 0x46495432  # ASCCI-ish "FIT2"; dedicated RNG substream tag.
+RNG_STREAM_TAG = 0x46495432  # ASCII-ish "FIT2"; dedicated RNG substream tag.
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def complex_array_from_dict(value: Mapping[str, Any]) -> np.ndarray:
     imag = np.asarray(value["imag"], dtype=float)
     if real.shape != imag.shape:
         raise ValueError(
-            f"complex array real/imag shape mismatch: {real.shape} vs {imag.shape}"          
+            f"complex array real/imag shape mismatch: {real.shape} vs {imag.shape}"
         )
     return real + 1j * imag
 
@@ -197,7 +197,7 @@ def fit_ringing_variable_projection(template: np.ndarray, start_tap: int) -> Dic
 
     template = np.asarray(template, dtype=np.complex128)
     if template.ndim != 2:
-        raise ValueError("template must have (antennas, taps)")
+        raise ValueError("template must have shape (antennas, taps)")
     if start_tap < 1 or start_tap >= template.shape[1]:
         raise ValueError(f"start_tap must be in [1, {template.shape[1] - 1}]")
 
@@ -304,7 +304,7 @@ def realize_static_two_term(
         if ring_start < 0 or ring_count <= 0 or ring_start + ring_count > num_taps:
             raise ValueError(
                 "invalid ringing tap span: "
-                f"start={start_tap}, count={ring_count}, num_taps={num_taps}"
+                f"start={ring_start}, count={ring_count}, num_taps={num_taps}"
             )
         ring_axis = np.arange(ring_count, dtype=float)
         offset = float(ant["offset_amp"]) * np.exp(
@@ -355,7 +355,7 @@ def estimate_per_antenna_complex_gain(cube: np.ndarray, static: np.ndarray) -> n
     """Least-squares complex gain for every frame and antenna."""
 
     cube = np.asarray(cube, dtype=np.complex128)
-    static = np.asarray(cube, dtype=np.complex128)
+    static = np.asarray(static, dtype=np.complex128)
     if cube.ndim != 3 or static.shape != cube.shape[1:]:
         raise ValueError(
             f"shape mismatch: cube={cube.shape}, static={static.shape}"
@@ -394,7 +394,7 @@ def fit_complex_ar1(
 
     numerator = np.sum(current * np.conj(previous), axis=0)
     denominator = np.sum(np.abs(previous) ** 2, axis=0)
-    rho = np.where(denominator > EPS, numerator / (denominator + EPS) , 0.0 + 0.0j)
+    rho = np.where(denominator > EPS, numerator / (denominator + EPS), 0.0 + 0.0j)
 
     pair_count = float(centered.shape[0] - 1)
     shrink = pair_count / (pair_count + max(float(shrinkage_frames), 0.0))
@@ -420,7 +420,7 @@ def generate_complex_ar1(
 ) -> np.ndarray:
     """Generate a stationary circular complex AR(1) process."""
 
-    if num_frames < 0:
+    if num_frames <= 0:
         raise ValueError("num_frames must be positive")
 
     sigma = np.asarray(component_std_value, dtype=float)
@@ -428,14 +428,14 @@ def generate_complex_ar1(
     if sigma.shape != rho.shape:
         raise ValueError(f"sigma/rho shape mismatch: {sigma.shape} vs {rho.shape}")
     _require_finite_nonnegative("component_std", sigma)
-    if not np.all(np.isfinite(rho.real)) or not np.all(np.finite(rho.imag)):
+    if not np.all(np.isfinite(rho.real)) or not np.all(np.isfinite(rho.imag)):
         raise ValueError("rho contains non-finite values")
     if np.any(np.abs(rho) >= 1.0):
         raise ValueError("all AR(1) coefficients must have magnitude < 1")
 
-    output = np.empty((num_frames) * sigma.shape, dtype=np.complex128)
+    output = np.empty((num_frames,) + sigma.shape, dtype=np.complex128)
     output[0] = sigma * (
-        rng.normal(size=sigma.size) + 1j * rng.normal(size=sigma.shape)
+        rng.normal(size=sigma.shape) + 1j * rng.normal(size=sigma.shape)
     )
 
     innovation_std = sigma * np.sqrt(np.maximum(1.0 - np.abs(rho) ** 2, 0.0))
@@ -534,13 +534,13 @@ class NoiseRuntimeSpec:
                 "component_std_per_ant_tap": (
                     self.additive_component_std_per_ant_tap.tolist()
                 ),
-                "rho_real_per_ant_tap": self.additive_component_std_per_ant_tap.real.tolist(),
-                "rho_imag_per_ant_tap": self.additive_component_std_per_ant_tap.imag.tolist(),
+                "rho_real_per_ant_tap": self.additive_rho_per_ant_tap.real.tolist(),
+                "rho_imag_per_ant_tap": self.additive_rho_per_ant_tap.imag.tolist(),
             },
         }
 
 
-class FittedNoiseRealizaer:
+class FittedNoiseRealizer:
     """Stateful or batch realizer for the fitted stochastic residual."""
 
     def __init__(self, spec: NoiseRuntimeSpec, rng: np.random.Generator):
@@ -622,10 +622,10 @@ class FittedNoiseRealizaer:
                 self.spec.additive_rho_per_ant_tap * self._additive_state
                 + additive_innovation
             )
-        
+
         assert self._gain_state is not None
         assert self._additive_state is not None
-        return frame * (1.0 * self._gain_state[:, None]) + self._additive_state
+        return frame * (1.0 + self._gain_state[:, None]) + self._additive_state
 
 
 # ---------------------------------------------------------------------------
@@ -658,7 +658,7 @@ class FittedImpairmentModel:
     @property
     def noise_spec(self) -> NoiseRuntimeSpec:
         return NoiseRuntimeSpec.from_noise_dict(
-            self.params["noise"], self.num_antennas, self.num_tpas
+            self.params["noise"], self.num_antennas, self.num_taps
         )
 
     def validate(self) -> None:
@@ -670,7 +670,7 @@ class FittedImpairmentModel:
                 raise ValueError(
                     f"unsupported fitted impairment schema: name={name!r}, version={version}"
                 )
-            
+
         meta = self.params.get("meta")
         if not isinstance(meta, Mapping):
             raise ValueError("params.meta is missing")
@@ -709,7 +709,7 @@ class FittedImpairmentModel:
 
         if deterministic_cube is None:
             static = self.static_template()
-            deterministic_cube = np.broadcase_to(
+            deterministic_cube = np.broadcast_to(
                 static[None, :, :],
                 (int(num_frames), self.num_antennas, self.num_taps),
             ).copy()
@@ -727,7 +727,7 @@ class FittedImpairmentModel:
                 )
         
         rng = np.random.default_rng(np.random.SeedSequence([int(seed), RNG_STREAM_TAG]))
-        return FittedNoiseRealizaer(self.noise_spec, rng).apply_cube(deterministic_cube)
+        return FittedNoiseRealizer(self.noise_spec, rng).apply_cube(deterministic_cube)
 
     def install_on_config(self, cfg: Any) -> None:
         """Attach the v2 stochastic model to an already-built simulator config.
@@ -740,7 +740,7 @@ class FittedImpairmentModel:
         """
 
         configured_antennas = int(
-            getattr(cfg.cir, "num_antennas", getattr(cfg, "num_antennas", self.num_antennas))            
+            getattr(cfg.cir, "num_antennas", getattr(cfg, "num_antennas", self.num_antennas))
         )
         configured_taps = int(getattr(cfg.cir, "num_bins", self.num_taps))
         if configured_antennas != self.num_antennas:
@@ -754,11 +754,11 @@ class FittedImpairmentModel:
                 f"json={self.num_taps}, config={configured_taps}. "
                 "The v2 per-tap noise model cannot be truncated safely."
             )
-        
+
         cfg.cir.enable_fitted_residual_noise = True
         cfg.cir.fitted_residual_noise_model = self.params["noise"]["stochastic"]
 
-        # Prevent the legacy scaler white-noise branch from adding a second
+        # Prevent the legacy scalar white-noise branch from adding a second
         # independent noise process.  Fitted residual std already includes the
         # measured quantization floor and all unexplained additive residual.
         cfg.cir.noise_std = 0.0
@@ -770,7 +770,7 @@ class FittedImpairmentModel:
 def build_realizer_from_config(
     cfg: Any,
     seed: Optional[int] = None,
-) -> Optional[FittedNoiseRealizaer]:
+) -> Optional[FittedNoiseRealizer]:
     """Create a dedicated fitted-noise realizer from a simulator config."""
 
     cir_cfg = cfg.cir
@@ -795,7 +795,7 @@ def build_realizer_from_config(
             getattr(cfg, "random_seed", getattr(cir_cfg, "random_seed", 42))
         )
     rng = np.random.default_rng(np.random.SeedSequence([int(seed), RNG_STREAM_TAG]))
-    return FittedNoiseRealizaer(spec, rng)
+    return FittedNoiseRealizer(spec, rng)
 
 
 def apply_fitted_noise_from_config(
@@ -838,7 +838,7 @@ class TwoTermImpairmentFitter:
         pri_s: Optional[float] = None,
         channel: Optional[Union[str, int]] = None,
         gain_deembedding: Optional[Mapping[str, Any]] = None,
-        quantization_diagnotics: Optional[Mapping[str, Any]] = None,
+        quantization_diagnostics: Optional[Mapping[str, Any]] = None,
         extra_meta: Optional[Mapping[str, Any]] = None,
     ) -> FittedImpairmentModel:
         cube_train = np.asarray(cube_train, dtype=np.complex128)
@@ -865,8 +865,8 @@ class TwoTermImpairmentFitter:
             **front_fit,
         }
         tx_rx_feedthrough_ringing: Dict[str, Any] = {
-            "model": "complex_offset + complex_ring * decay^k * exp(j * freq * k)"
-            **ringing_fit
+            "model": "complex_offset + complex_ring * decay^k * exp(j * freq * k)",
+            **ringing_fit,
         }
 
         static = realize_static_two_term(
@@ -947,7 +947,7 @@ class TwoTermImpairmentFitter:
         normalized_gain = gains / np.mean(gains, axis=0, keepdims=True)
         gain_delta = normalized_gain - 1.0
 
-        gain_sigma, gain_rho, centered_gain_delata = fit_complex_ar1(
+        gain_sigma, gain_rho, centered_gain_delta = fit_complex_ar1(
             gain_delta,
             axis=0,
             max_abs_rho=self.options.max_abs_rho,
@@ -1008,15 +1008,15 @@ class TwoTermImpairmentFitter:
                 "channel": channel,
                 "fit_domain": "RX-gain-deembedded complex CIR",
                 "training_order": "consecutive slow-time frames",
-                **(dict(extra_meta) if extra_meta else {})
+                **(dict(extra_meta) if extra_meta else {}),
             },
             "gain_deembedding": dict(gain_deembedding or {}),
-            "static_complex_temlate": {
+            "static_complex_template": {
                 "preferred_realization_model": False,
                 "definition": (
                     "Exact parametric feedthrough + ringing realization used by the simulator"
                 ),
-                ** complex_array_dict(static)
+                **complex_array_dict(static)
             },
             "empirical_static_template": {
                 "diagnostic_only": True,
@@ -1027,7 +1027,7 @@ class TwoTermImpairmentFitter:
             "noise": {
                 "schema_version": 2,
                 "model": (
-                    "per-antenna miultiplicative complex AR(1) gain + "
+                    "per-antenna multiplicative complex AR(1) gain + "
                     "per_antenna/per_tap additive complex AR(1)"
                 ),
                 "equation": "y[f,a,k]=(1+g[f,a])*S[a,k]+n[f,a,k]",
@@ -1057,7 +1057,7 @@ class TwoTermImpairmentFitter:
                 "enabled_in_v2_runtime": True,
                 "model": "complex AR(1) multiplicative gain; not legacy iid frame_drift",
                 "complex_gain_component_std_per_ant": gain_sigma.tolist(),
-                "complex_gain_rho)real_per_ant": gain_rho.real.tolist(),
+                "complex_gain_rho_real_per_ant": gain_rho.real.tolist(),
                 "complex_gain_rho_imag_per_ant": gain_rho.imag.tolist(),
                 # Compatibility values only.  The v2 injector leaves the old
                 # frontend frame-drift switch off to avoid double counting.
@@ -1065,8 +1065,8 @@ class TwoTermImpairmentFitter:
                 "common_phase_circular_std_rad": float(np.mean(gain_sigma)),
                 "fractional_timing_jitter_std_bins": 0.0,
             },
-            "quantization": dict(quantization_diagnotics or []),
-            "fit_diagnotics": {
+            "quantization": dict(quantization_diagnostics or []),
+            "fit_diagnostics": {
                 "static_complex_nrmse_per_ant": static_nrmse.tolist(),
                 "static_complex_rmse_per_ant": np.sqrt(
                     np.mean(np.abs(static_fit_error) ** 2, axis=1)
@@ -1084,7 +1084,7 @@ class TwoTermImpairmentFitter:
                 "max_abs_rho": float(self.options.max_abs_rho),
                 "ar1_shrinkage_frames": float(self.options.ar1_shrinkage_frames),
                 "gain_centered_component_std_check": component_std(
-                    centered_gain_delata, axis=0
+                    centered_gain_delta, axis=0
                 ).tolist(),
                 "additive_centered_component_std_check": component_std(
                     centered_additive, axis=0
@@ -1111,7 +1111,7 @@ __all__ = [
     "component_std",
     "component_variance",
     "complex_array_dict",
-    "complex_array_from_dicf",
+    "complex_array_from_dict",
     "estimate_per_antenna_complex_gain",
     "fit_complex_ar1",
     "generate_complex_ar1",

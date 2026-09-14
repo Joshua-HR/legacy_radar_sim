@@ -112,8 +112,8 @@ def load_pattern_gains_dbi_2d_per_ant_csv(
     """Load one measured G(phi, theta) pattern CSV per antenna.
 
     All CSVs must share the same phi/theta axes (this project's
-    AntennaConfig has a single pateern_phi_deg/pattern_theta_deg pair
-    shared acroos antennas - only the gain values differ per antenna).
+    AntennaConfig has a single pattern_phi_deg/pattern_theta_deg pair
+    shared across antennas - only the gain values differ per antenna).
 
     Args:
         csv_paths: list of CSV paths, one per antenna index (index 0 ->
@@ -122,7 +122,7 @@ def load_pattern_gains_dbi_2d_per_ant_csv(
     Returns:
         (pattern_phi_deg, pattern_theta_deg, pattern_gains_dbi_2d_per_ant):
             shared phi/theta axes, and a tuple of per-antenna gain tables
-            (each shape [len(pattern_phi_deg), len(pattern_theta_get)]).
+            (each shape [len(pattern_phi_deg), len(pattern_theta_deg)]).
 
     Raises:
         ValueError: csv_paths is empty, or the CSVs' phi/theta axes
@@ -279,7 +279,7 @@ _debug_check_geometry_convention()
 # --------------------------------------------------------------------------
 # Default 3D pattern grid factories (used as dataclass default_factory)
 #
-# Convenction
+# Convention
 #   pattern_phi_deg     = azimuth axis
 #   pattern_theta_deg   = polar angle axis (0=+z, 90=horizon, 180=-z)
 #   pattern_gains_dbi_2d shape = [len(pattern_phi_deg), len(pattern_theta_deg)]
@@ -390,12 +390,12 @@ class AntennaConfig:
     # Kept for backward compatibility with pattern_mode == "table".
     pattern_angles_deg: Tuple[float, ...] = (
         -180, -165, -150, -135, -120, -105, -90, -75, -60, -45, -30, -15,
-        0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 160, 165, 180
+        0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180
     )
 
     pattern_gains_dbi: Tuple[float, ...] = (
         -3.2, -3.0, -2.8, -2.5, -2.2, -1.8, -1.4, -1.1, -0.8, -0.5, -0.3, -0.1,
-        0.0, -0.1, -0.3, -0.5, -0.8, -1.1, -1.4, -1.8, -2.2, -2.5, -2.8, -3.0, -3.2 
+        0.0, -0.1, -0.3, -0.5, -0.8, -1.1, -1.4, -1.8, -2.2, -2.5, -2.8, -3.0, -3.2
     )
 
     # --- "table_3d": full 2D G(phi, theta) table --------------------------
@@ -701,11 +701,11 @@ class AntennaConfig:
                 "table_3d" to select a per-antenna gain table when
                 pattern_gains_dbi_2d_per_ant is set (see
                 _pattern_gains_dbi_2d_for_ant()); every other pattern_mode
-                igonores it (they have no per-antenna table concept).
+                ignores it (they have no per-antenna table concept).
 
         Returns:
             float: gain
-        """     
+        """
         if not self.enable_radiation_pattern:
             return 1.0
 
@@ -1020,6 +1020,37 @@ class RadarMotionConfig:
     # filled in by CIRSimulator once the trajectory is built. It rides into
     # cir_metadata.json through CIRMetadata.raw_config, so no artifact writer
     # or schema needs to change.
+    metadata: Optional[Dict[str, object]] = None
+
+
+@dataclass
+class TargetOverrideConfig:
+    """Container for the optional ``[target_override]`` INI section.
+
+    Holds per-target kinematics *deviations* applied on top of whatever
+    ``[profiles] target_profile`` resolved to, so a range / speed / breathing
+    sweep can be expressed in config instead of by editing the hardcoded
+    ``Target(...)`` literals in ``CIRSimulator._apply_target_profile()``.
+
+    The section is optional and an absent section is a bit-identical no-op, but
+    WITHIN the section the surface is strict: unknown keys, out-of-range target
+    indices, and values the engine would silently ignore are hard errors
+    (``target_override.parse_ini_items`` / ``validate_values``). Same rationale
+    as RadarMotionConfig above.
+
+    Units follow the project convention (the name carries the unit). Velocity is
+    offered as ``velocity_*_m_per_s`` and converted to the engine's native
+    ``velocity_*_m_per_frame`` using the resolved ``[radar] period``.
+    """
+
+    #: {target_index: {field: parsed value}}. Empty == section absent.
+    entries: Dict[int, Dict[str, object]] = field(default_factory=dict)
+
+    #: What was actually applied, including both velocity spellings where a
+    #: conversions happened. Filled in by CIRSimulator; rides into
+    #: cir_metadata.json through CIRMetadata.raw_config, so no artifact writer
+    #: or schema needs to change. This is what makes a sweep point
+    #: reconstructible from its own run directory.
     metadata: Optional[Dict[str, object]] = None
 
 @dataclass

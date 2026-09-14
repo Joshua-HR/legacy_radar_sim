@@ -1375,6 +1375,35 @@ class CIRSimulator:
 
         else:
             raise ValueError("Unsupported target_profile.")
+
+    def _apply_target_override(self):
+        """
+        Apply the optional [target_override] deviations onto the resolved targets.
+
+        Runs immediately after _apply_target_profile(), so cfg.targets is the
+        final list and target indices can be range-checked. cfg.radar.period is
+        already final at this point (no profile touches it), which is what makes
+        the velocity_*_m_per_s -> velocity_*_m_per_frame conversion here agree
+        with the frame_period_s that _sync_target_frame_period() writes next.
+
+        Also runs before _setup_radar_motion(), so the derived ego-motion
+        presets (mirror/cancel_target_micromotion) see the overriden
+        micro-motion rather than the profile's default.
+
+        No-op when the section was absent, so legacy runs stay bit-identical.
+        """
+        entries = self.cfg.target_override.entries
+        if not entries:
+            return
+
+        frame_period_s = self.cfg.radar.period / 1000.0
+
+        self.cfg.target_override.metadata = target_override.apply_to_targets(
+            targets=self.cfg.targets,
+            overrides=entries,
+            frame_period_s=frame_period_s,
+            target_profile=self.cfg.target_profile,
+        )
     
     def _sync_target_frame_period(self):
         """

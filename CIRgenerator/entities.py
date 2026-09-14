@@ -312,7 +312,7 @@ class Target(StaticClutterPath):
             "material_factor": float(self.material_factor),
             "height_m": float(self.height_m),
             "num_scatter_points_z": int(self.num_scatter_points_z),
-            "bottom_z": float(self.bottom_z_m),
+            "bottom_z_m": float(self.bottom_z_m),
             "enable_micro_motion": bool(self.enable_micro_motion),
             "micro_motion_amplitude_m": float(self.micro_motion_amplitude_m),
             "micro_motion_frequency_hz": float(self.micro_motion_frequency_hz),

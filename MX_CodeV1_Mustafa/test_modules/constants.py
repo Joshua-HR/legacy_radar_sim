@@ -8,11 +8,11 @@ from enum import Enum
 RANGING_SESSION = "ranging session"
 CCC_RANGING_SESSION = "ccc"
 
-# Testing realted variables
+# Testing related variables
 SESSION_ID_0 = f'{0:08x}'
 SESSION_ID_1 = f'{1:08x}'
 
-# MAC Address of the UWBS themselves participating in UWB session.
+# MAC Addresses of the UWBS themselves participating in UWB session.
 MAC_ADDR1 = '3412'
 MAC_ADDR2 = '7856'
 
@@ -72,12 +72,12 @@ class CodeEnum(Enum):
     """Enum wrapper class.
 
     Provides association between human-readable label and its internal code.
-    Provides case insensitivity :obj:`CodeEnum` creation.
+    Provides case insensitive :obj:`CodeEnum` creation.
 
     Attributes:
         value (str): The string-label of the enum instance.
         code (int | str, optional): The associated internal code.
-        Dafaults to ``None``.
+        Defaults to ``None``.
 
     Example:
         When Declaring new :obj:``CodeEnum`` child-class always use uppercase ``label``.
@@ -127,7 +127,7 @@ _CUSTOM_PSC_HEADER = re.compile(_PFX)
 _CUSTOM_PSF = re.compile(_PFX + r'([A-Za-z0-9]{0,20})?$', re.IGNORECASE)
 # FIRA PSF for TX
 _FIRA_TX_PSF = "00000000FF00000000010100030200FFFAF5FA00483E260BFA0B263E0300FAF500FF0002FF000101"
-# FIRA RSF for RX
+# FIRA PSF for RX
 _FIRA_RX_PSF = "02140000000000000000FFFE0001F6F50204001F4020"
 
 class PulseshapeCombo(CodeEnum):
@@ -195,12 +195,12 @@ class RangingRoundUsage(CodeEnum):
     N_SINGLE_SIDED          = ('NSS', 0x03)
     # DS-TWR with Non-deferred Mode
     N_DOUBLE_SIDED          = ('NDS', 0x04)
-    # OWL DL-TDoA
-    OWL_DL_TDOA             = ('OWR', 0x05)
+    # OWR DL-TDoA
+    OWR_DL_TDOA             = ('OWR', 0x05)
     # OWR for AoA Measurement
     OWR_AOA_MEAS            = ('OWRA', 0x06)
     # eSS-TWR with Non-deferrred Mode for Contention-based ranging
-    EN_SIGNLE_SIDED         = ('NSS', 0x07)
+    EN_SINGLE_SIDED         = ('NSS', 0x07)
     # aDS-TWR Non-deferred Mode for Contention-based ranging
     AN_DOUBLE_SIDED         = ('NSS', 0x08)
     # Data transfer mode
@@ -313,10 +313,10 @@ class SessionInfoConfig(Enum):
 
 class PSDUDataRate(Enum):
     M6_81 = 0x00 # 6.81 Mbps - applicable if PRF_MODE is set to 0 or 1
-    M7_80 = 0x01 # 7.90 Mbps - applicable if PRF_MODE is set to 1
-    M27_2 = 0x02 # 27.2 Mbps - applicable is PRF_MODE is set to 2
+    M7_80 = 0x01 # 7.80 Mbps - applicable if PRF_MODE is set to 1
+    M27_2 = 0x02 # 27.2 Mbps - applicable if PRF_MODE is set to 2
     M31_2 = 0x03 # 31.2 Mbps - applicable if PRF_MODE is set to 2
-    K850  = 0x04 # 850 Kbps
+    K850  = 0x04 # 850 kbps
     # NOTE: 0x05-0xFF = RFU
 
 class RangingTimeStruct(Enum):
@@ -425,33 +425,33 @@ BASE_STS = [
     '#HF1', '#HAB', '#HE8', '#HA1', '#HF9', '#H75', '#HBA', '#HBC',
     '#H56', '#HC6', '#H53', '#HF2', '#H89', '#H5C', '#H6C', '#HEB',
     '#HB3', '#H88', '#H47', '#HBA', '#HDB', '#H3D', '#H54', '#H8F',
-    '#HAB', '#HF2', '#HA2', '#HB6', '#H57',  '#HA', '#HAF', '#H6F',
-    '#HAD', '#H2C', '#H85', '#H26', '#H1C', '#HEF', '#HF0', '#HF4', 
+    '#HAB', '#HF3', '#HA2', '#HB6', '#H57',  '#HA', '#HAF', '#H6F',
+    '#HAD', '#H2C', '#H85', '#H26', '#H1C', '#HFF', '#HF0', '#HF4', 
     '#HCF', '#HA7', '#H7B', '#HA3', '#HD3', '#H92', '#H18', '#H33',
     '#HDC', '#HE8', '#H18', '#HAA', '#H8C', '#H1B', '#H12', '#H78',
-    '#HEF', '#H85', '#H51', '#H39', '#H24', '#H52', '#H7F', '#H34', 
+    '#HEF', '#H85', '#H51', '#H39', '#H24', '#H52', '#H7F', '#H34',
     '#HF4', '#H85', '#H1F', '#HCE', '#HA5', '#HB8', '#H87', '#HD7',
     '#H6A', '#H28', '#H6E', '#H3D', '#H85', '#H78', '#HE3', '#H7F',
     '#H49',  '#HC', '#HCF', '#H24', '#H7A', '#HAA', '#HFC',  '#H1',
     '#H89', '#H28', '#H91', '#HEE', '#HB2', '#HE4', '#H67', '#H13',
     '#H6B', '#H5B', '#H2C', '#H5B', '#H3C', '#H55', '#HB8', '#HED',
-    '#H5D', '#H87', '#H2A', '#H4D', '#H37', '#HE7', '#HF9', '#HBE',
+    '#H5D', '#HB7', '#H2A', '#H4D', '#H37', '#HE7', '#HF9', '#HBE',
     '#HA8', '#H80', '#H8F', '#H92', '#H4C', '#H1C', '#HEB',  '#HD',
     '#H15',  '#H5', '#HAD', '#H42', '#H39', '#HC2', '#HCD', '#H5C',
     '#H5A', '#HA2', '#HB0', '#HDC', '#HCF', '#H6E', '#HFA', '#HB6',
-    '#HE1', '#HD3', '#H3B', '#HD8', '#H3B', '#H43', '#H50', '#H56',
+    '#HE1', '#HD3', '#H3B', '#HDB', '#H3B', '#H43', '#H50', '#H56',
     '#HD7', '#H75', '#HE7', '#H34', '#H63', '#H84',  '#H2',  '#H5',
-    '#HC9', '#H93', '#HD8', '#H53', '#HA6', '#HEC', '#H76', '#H44', 
+    '#HC9', '#H93', '#HDB', '#H53', '#HA6', '#HEC', '#H76', '#H44', 
     '#H2B', '#HCB', '#H56', '#HE7',  '#H0', '#H4F', '#H89',  '#HF',
     '#H3E', '#H8E', '#H9B', '#HBA', '#H99', '#HA3', '#HB3', '#H5B',
     '#H54', '#H34', '#H80', '#HA5', '#H8A', '#H97', '#H46',  '#H6',
     '#HF9', '#H3D', '#H63', '#H6D', '#HB2', '#H56', '#HB2', '#H82',
      '#H9', '#H74', '#H1B', '#H8E', '#H90', '#H29', '#H37', '#H3F',
     '#HF0', '#H65', '#HFC', '#H48', '#HBD', '#HEE', '#H5F', '#H4A',
-    '#HDE',  '#HB', '#H41', '#HED', '#HEB', '#H7D', '#HC4', '#HC2',
+    '#HDE',  '#HB', '#HA1', '#HED', '#HEB', '#H7D', '#HC4', '#HC2',
     '#H37', '#H5C', '#H8F', '#HA6', '#HD9', '#H16', '#HDE', '#H27',
     '#H12', '#H98',  '#H0', '#HB1',  '#HA', '#H89', '#H39', '#HF6',
-    '#H93', '#H7B', '#HEC', '#HD5', '#H7A', '#H50', '#H8F', '#HC8', 
+    '#H93', '#H7B', '#HEC', '#HD5', '#H7A', '#H50', '#H8F', '#HC8',
     '#HD1', '#H78', '#H2C', '#H2E', '#HB7', '#H1B', '#H1B',  '#HF',
     '#H26', '#H9A', '#H87', '#HC2', '#H8E', '#H3F', '#H6F', '#H23',
     '#H2F', '#H25', '#H2A', '#H4E', '#H6C', '#H5A', '#HF6', '#HAC',

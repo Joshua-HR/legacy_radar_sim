@@ -1,12 +1,12 @@
-"""Strict, optional per-tangent kinematics override surface (``[target_override]'').
+"""Strict, optional per-target kinematics override surface (``[target_override]'').
 
 Why this module exists
 ---------------------
-Every Built-in scene is selected by *name* through ``[profiles] target_profile``,
+Every built-in scene is selected by *name* through ``[profiles] target_profile``,
 and each name expands to hardcoded ``Target(...)`` literals in
 ``CIRSimulator._apply_target_profile()``. That is fine for a fixed catalog but
 makes a *sweep* impossible to express: varying a target's range, speed, or
-breathing amplitude required editing thos literals in Python, so the resulting
+breathing amplitude required editing those literals in Python, so the resulting
 run's own ``resolved_config.ini`` / ``cir_metadata.json`` did not record which
 sweep point it was. Eight such runs were received from a teammate and were
 byte-identical in config apart from ``target_profile`` -- none of them
@@ -28,7 +28,7 @@ Design rules
   ``micro_motion_axis`` as ``"radial"`` and early-returns on a non-positive
   amplitude, so a typo or a sign error produces a plausible-looking CIR rather
   than an exception.
-* **Veolocity is offered in m/s.** The engine field is
+* **Velocity is offered in m/s.** The engine field is
   ``velocity_xy_m_per_frame`` -- metres per *slow-time frame*, not per second.
   That unit has already caused one real error (a ``1.0`` intended as 1 m/s
   became 200 m/s at a 5 ms frame period). ``velocity_*_m_per_s`` is therefore
@@ -52,7 +52,7 @@ INI_SECTION = "target_override"
 #: of an existing key.
 _KEY_PATTERN = re.compile(r"^target(\d+)_(.+)$")
 
-#: field name -> value kine. Only these fields may be overriden; anything else
+#: field name -> value kind. Only these fields may be overridden; anything else
 #: (including fields that exist on Target but describe the 3D extent or the
 #: reflection list) is rejected so the surface stays reviewable.
 _FIELD_KINDS: Dict[str, str] = {
@@ -64,7 +64,7 @@ _FIELD_KINDS: Dict[str, str] = {
     "velocity_z_m_per_s": "float",
     # bulk velocity -- engine-native (m/frame) spelling
     "velocity_xy_m_per_frame": "vec2",
-    "velocity_z_per_frame": "float",
+    "velocity_z_m_per_frame": "float",
     # micro-motion (breathing)
     "enable_micro_motion": "bool",
     "micro_motion_amplitude_m": "float",
@@ -88,7 +88,7 @@ SUPPORTED_MICRO_MOTION_AXES: Tuple[str, ...] = ("radial", "x", "y", "z")
 
 #: (m/s spelling, m/frame spelling) for each axis. Supplying both is ambiguous.
 _VELOCITY_SPELLINGS: Tuple[Tuple[str, str], ...] = (
-    ("veolocity_xy_m_per_s", "velocity_xy_m_per_frame"),
+    ("velocity_xy_m_per_s", "velocity_xy_m_per_frame"),
     ("velocity_z_m_per_s", "velocity_z_m_per_frame"),
 )
 
@@ -136,7 +136,7 @@ def _parse_bool(field: str, raw: str) -> bool:
 
 
 def _parse_vec2(field: str, raw: str) -> Tuple[float, float]:
-    parts = [chunk for chunk in re.split(r"[,/s]+", raw.strip()) if chunk]
+    parts = [chunk for chunk in re.split(r"[,\s]+", raw.strip()) if chunk]
     if len(parts) != 2:
         raise ValueError(
             f"[{INI_SECTION}] {field}: expected 2 comma- or space-separated "
@@ -177,7 +177,7 @@ def parse_ini_items(items: Iterable[Tuple[str, str]]) -> Dict[int, Dict[str, Any
     Args:
         items: ``(key, raw_value)`` pairs from the section, with any
             ``[DEFAULT]``-inherited keys already filtered out by the caller
-            (``configparserl.items()`` folds those in and they are not this
+            (``configparser.items()`` folds those in and they are not this
             section's own).
 
     Returns:
@@ -226,7 +226,7 @@ def parse_ini_items(items: Iterable[Tuple[str, str]]) -> Dict[int, Dict[str, Any
 
 
 def validate_values(index: int, fields: Dict[str, Any], frame_period_s: float) -> None:
-    """Rejecting values the engine would silently ignore or alias.
+    """Reject values the engine would silently ignore or alias.
 
     Args:
         index: target index, for error messages.
@@ -251,7 +251,7 @@ def validate_values(index: int, fields: Dict[str, Any], frame_period_s: float) -
     if amplitude is not None and amplitude < 0.0:
         raise ValueError(
             f"{prefix}: micro_motion_amplitude_m must be >= 0, got {amplitude}. "
-            "Target._apply_target_mircro_motion() early-returns on a "
+            "Target._apply_target_micro_motion() early-returns on a "
             "non-positive amplitude, so a negative value is a silent no-op "
             "rather than a phase flip -- use micro_motion_phase_rad = pi."
         )
@@ -261,7 +261,7 @@ def validate_values(index: int, fields: Dict[str, Any], frame_period_s: float) -
         nyquist_hz = 0.5 / frame_period_s
         if frequency < 0.0:
             raise ValueError(
-                f"{prefix}: micro_motion_frequency_hz musy be >= 0, got {frequency}"
+                f"{prefix}: micro_motion_frequency_hz must be >= 0, got {frequency}"
             )
         if frequency >= nyquist_hz:
             raise ValueError(
@@ -303,7 +303,7 @@ def apply_to_targets(
         target_profile: profile name, for the out-of-range error message.
 
     Returns:
-        A metadata dict descriging exactly what was applied, including both
+        A metadata dict describing exactly what was applied, including both
         velocity spellings where a conversion happened. Empty overrides return
         an empty dict so the metadata stays absent for legacy runs.
 
@@ -316,7 +316,7 @@ def apply_to_targets(
 
     metadata: Dict[str, Any] = {
         "frame_period_s": float(frame_period_s),
-        "targets": {}
+        "targets": {},
     }
 
     for index in sorted(overrides):
@@ -371,7 +371,7 @@ def _scale(value: Any, factor: float) -> Any:
 
 
 def _jsonable(value: Any) -> Any:
-    """Make a parsed value safe for the. metadata dict / JSON export."""
+    """Make a parsed value safe for the metadata dict / JSON export."""
     if isinstance(value, tuple):
         return [float(component) for component in value]
     return value
