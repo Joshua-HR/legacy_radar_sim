@@ -137,7 +137,7 @@ class ProcessingConfig:
     track_min_range_change_cm: float = 45.0     # Minimum total range change.
     track_min_slope_cm_per_segment: float = 5.0 # Minimum average slope.
     track_max_misses: int = 2                   # Allowed number of consecutive missed frames.
-    track_min_abs_velocity_abs: float = 0.06    # Minimum velocity to use for tracking.
+    track_min_abs_velocity_mps: float = 0.06    # Minimum velocity to use for tracking.
     track_min_score: float = 0.0                # Lower bound of tracking candidate score.
     track_min_step_cm: float = 10.0             # Minimum individual step (consecutive range difference).
     track_min_significant_steps: int = 2        # Minimum number of significant steps.
