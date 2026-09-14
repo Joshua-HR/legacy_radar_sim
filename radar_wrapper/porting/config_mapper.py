@@ -44,19 +44,19 @@ class ConfigMapper:
             "persistence_min_hits": self.cfg.getint("mx", "persistence_hits", fallback=2),
             "persistence_range_gate_cm": self.cfg.getfloat("mx", "persistence_range_cm", fallback=45.0),
             "reject_edge_doppler_bins": self.cfg.getint("mx", "reject_edge_doppler_bins", fallback=1),
-            # Near-zone ghost motion block. Exposed because its false-alarm rate
+            # Near-zone ghost-motion block. Exposed because its false-alarm rate
             # scales with segment_size and it does NOT respect skip_bins or
             # min_range_cm: _near_zone_block_status() builds its own mask over
             # every tap below near_zone_block_max_cm (50 cm -> taps 0..3) and
             # suppresses the WHOLE segment if >= near_zone_block_min_cells of
             # those (segment_size x 4) cells exceed near_zone_block_excess_db.
-            # At segment_size = 32 that is 128 candidates cells; at 256 it is
+            # At segment_size = 32 that is 128 candidate cells; at 256 it is
             # 1024, and against a 3-segment 95th-percentile baseline a couple of
             # them clear 6 dB on noise alone. A long coherent window is exactly
             # what micro-Doppler (breathing) needs, so the two interact -- see
             # docs/standard_validation_geometry.md. Defaults match
             # ProcessingConfig, so no existing run changes.
-            "near_zone_block_enabled": self.cfg.boolean("mx", "near_zone_block_enabled", fallback=True),
+            "near_zone_block_enabled": self.cfg.getboolean("mx", "near_zone_block_enabled", fallback=True),
             "near_zone_block_max_cm": self.cfg.getfloat("mx", "near_zone_block_max_cm", fallback=50.0),
             "near_zone_block_excess_db": self.cfg.getfloat("mx", "near_zone_block_excess_db", fallback=6.0),
             "near_zone_block_min_cells": self.cfg.getint("mx", "near_zone_block_min_cells", fallback=2),
